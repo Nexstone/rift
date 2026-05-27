@@ -20,9 +20,15 @@ function colorNum(val: number, suffix = ''): string {
 export default class Pairs extends GatedCommand {
   static override description = 'Backtest a pairs/spread trade between two assets (e.g. BTC/ETH)'
 
+  // `pairs-backtest` is the engine command name and was the previous
+  // wrapper name; alias kept so scripts and docs that referenced it
+  // continue to work.
+  static override aliases = ['pairs-backtest']
+
   static override examples = [
     '$ rift pairs --a BTC --b ETH --tf 1h',
     '$ rift pairs --a BTC --b ETH --entry-z 2.5 --lookback 336',
+    '$ rift pairs --a BTC --b ETH --json   # raw JSON for pipelines',
   ]
 
   static override flags = {
@@ -35,15 +41,18 @@ export default class Pairs extends GatedCommand {
     'exit-z': Flags.string({description: 'Z-score exit threshold', default: '0.5'}),
     'stop-z': Flags.string({description: 'Z-score stop loss', default: '4.0'}),
     'max-hold': Flags.integer({description: 'Max hold time (candles)', default: 72}),
+    json: Flags.boolean({description: 'Emit raw JSON result instead of the rendered panel', default: false}),
   }
 
   async run(): Promise<void> {
     const {flags} = await this.parse(Pairs)
 
-    this.log('')
-    this.log(`  ${bold('Pairs Trading Backtest')}`)
-    this.log(`  ${dim(`${flags.a}/${flags.b} spread on ${flags.tf} — z-score entry: ${flags['entry-z']}, exit: ${flags['exit-z']}`)}`)
-    this.log('')
+    if (!flags.json) {
+      this.log('')
+      this.log(`  ${bold('Pairs Trading Backtest')}`)
+      this.log(`  ${dim(`${flags.a}/${flags.b} spread on ${flags.tf} — z-score entry: ${flags['entry-z']}, exit: ${flags['exit-z']}`)}`)
+      this.log('')
+    }
 
     const engineArgs: string[] = [
       '--a', flags.a!,
@@ -58,6 +67,17 @@ export default class Pairs extends GatedCommand {
     ]
 
     await runEngine('pairs-backtest', engineArgs, (msg: EngineMessage) => {
+      if (flags.json) {
+        // JSON mode: emit the result payload only, silently consume
+        // progress/status so the output is pipe-safe.
+        if (msg.type === 'result') {
+          const {type: _t, ...rest} = msg
+          this.log(JSON.stringify(rest, null, 2))
+        } else if (msg.type === 'error') {
+          this.error(msg.msg as string)
+        }
+        return
+      }
       if (msg.type === 'progress' && msg.msg) {
         process.stdout.write(`\r  ${dim(String(msg.msg))}${''.padEnd(20)}`)
       } else if (msg.type === 'result') {

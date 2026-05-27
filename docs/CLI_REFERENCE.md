@@ -65,7 +65,8 @@ COMMANDS
   new                 Scaffold a new trading strategy or scout signal
   pairs               Backtest a pairs/spread trade between two assets (e.g.
                       BTC/ETH)
-  pairs-backtest      Backtest a pairs/spread trade (e.g. BTC/ETH spread)
+  pairs-backtest      Backtest a pairs/spread trade between two assets (e.g.
+                      BTC/ETH)
   portfolio-backtest  Run a multi-strategy portfolio backtest from a
                       portfolio.yaml
   portfolio-matrix    Strategy × pair P&L matrix, correlation matrix, and regime
@@ -503,7 +504,8 @@ COMMANDS
   new                 Scaffold a new trading strategy or scout signal
   pairs               Backtest a pairs/spread trade between two assets (e.g.
                       BTC/ETH)
-  pairs-backtest      Backtest a pairs/spread trade (e.g. BTC/ETH spread)
+  pairs-backtest      Backtest a pairs/spread trade between two assets (e.g.
+                      BTC/ETH)
   portfolio-backtest  Run a multi-strategy portfolio backtest from a
                       portfolio.yaml
   portfolio-matrix    Strategy × pair P&L matrix, correlation matrix, and regime
@@ -713,7 +715,7 @@ Backtest a pairs/spread trade between two assets (e.g. BTC/ETH)
 USAGE
   $ rift pairs [--a <value>] [--b <value>] [--tf <value>] [--equity
     <value>] [--lookback <value>] [--entry-z <value>] [--exit-z <value>]
-    [--stop-z <value>] [--max-hold <value>]
+    [--stop-z <value>] [--max-hold <value>] [--json]
 
 FLAGS
   --a=<value>         [default: BTC] First asset
@@ -721,6 +723,7 @@ FLAGS
   --entry-z=<value>   [default: 2.0] Z-score entry threshold
   --equity=<value>    [default: 10000] Starting equity
   --exit-z=<value>    [default: 0.5] Z-score exit threshold
+  --json              Emit raw JSON result instead of the rendered panel
   --lookback=<value>  [default: 168] Rolling z-score window (candles)
   --max-hold=<value>  [default: 72] Max hold time (candles)
   --stop-z=<value>    [default: 4.0] Z-score stop loss
@@ -729,17 +732,22 @@ FLAGS
 DESCRIPTION
   Backtest a pairs/spread trade between two assets (e.g. BTC/ETH)
 
+ALIASES
+  $ rift pairs-backtest
+
 EXAMPLES
   $ rift pairs --a BTC --b ETH --tf 1h
 
   $ rift pairs --a BTC --b ETH --entry-z 2.5 --lookback 336
+
+  $ rift pairs --a BTC --b ETH --json   # raw JSON for pipelines
 
 ```
 
 ### `rift pairs-backtest`
 
 ```
-Backtest a pairs/spread trade (e.g. BTC/ETH spread)
+Backtest a pairs/spread trade between two assets (e.g. BTC/ETH)
 
 USAGE
   $ rift pairs-backtest [--a <value>] [--b <value>] [--tf <value>] [--equity
@@ -750,21 +758,26 @@ FLAGS
   --a=<value>         [default: BTC] First asset
   --b=<value>         [default: ETH] Second asset
   --entry-z=<value>   [default: 2.0] Z-score entry threshold
-  --equity=<value>    [default: 10000] Starting equity USD
+  --equity=<value>    [default: 10000] Starting equity
   --exit-z=<value>    [default: 0.5] Z-score exit threshold
-  --json              Emit raw JSON only
-  --lookback=<value>  [default: 168] Rolling window for z-score (hours)
-  --max-hold=<value>  [default: 72] Max hold time in candles
+  --json              Emit raw JSON result instead of the rendered panel
+  --lookback=<value>  [default: 168] Rolling z-score window (candles)
+  --max-hold=<value>  [default: 72] Max hold time (candles)
   --stop-z=<value>    [default: 4.0] Z-score stop loss
-  --tf=<value>        [default: 1h] Candle interval
+  --tf=<value>        [default: 1h] Timeframe
 
 DESCRIPTION
-  Backtest a pairs/spread trade (e.g. BTC/ETH spread)
+  Backtest a pairs/spread trade between two assets (e.g. BTC/ETH)
 
-EXAMPLES
+ALIASES
   $ rift pairs-backtest
 
-  $ rift pairs-backtest --a BTC --b ETH --tf 1h --entry-z 2.0
+EXAMPLES
+  $ rift pairs --a BTC --b ETH --tf 1h
+
+  $ rift pairs --a BTC --b ETH --entry-z 2.5 --lookback 336
+
+  $ rift pairs --a BTC --b ETH --json   # raw JSON for pipelines
 
 ```
 
@@ -1118,8 +1131,9 @@ FLAGS
   --leverage=<value>  [default: 1] Leverage multiplier
   --pair=<value>      [default: BTC-PERP] Trading pair
   --tf=<value>        [default: 1h] Timeframe
-  --wf=<value>        [default: 3m/1m] Walk-forward config: train/test (e.g.
-                      3m/1m)
+  --wf=<value>        Walk-forward config: train/test (e.g. 6m/3m). Default uses
+                      the strategy's recommended_train_months /
+                      recommended_test_months (or 3m/1m if unset).
 
 DESCRIPTION
   Run walk-forward analysis to test strategy robustness
@@ -1151,8 +1165,9 @@ FLAGS
   --leverage=<value>  [default: 1] Leverage multiplier
   --pair=<value>      [default: BTC-PERP] Trading pair
   --tf=<value>        [default: 1h] Timeframe
-  --wf=<value>        [default: 3m/1m] Walk-forward config: train/test (e.g.
-                      3m/1m)
+  --wf=<value>        Walk-forward config: train/test (e.g. 6m/3m). Default uses
+                      the strategy's recommended_train_months /
+                      recommended_test_months (or 3m/1m if unset).
 
 DESCRIPTION
   Run walk-forward analysis to test strategy robustness
