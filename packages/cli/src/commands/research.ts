@@ -357,11 +357,6 @@ export default class Research extends GatedCommand {
     this.log(`    ${cyan('2')}  See which pairs work best for a strategy`)
     this.log(`    ${cyan('3')}  Back to Explore`)
     this.log('')
-    this.log(`  ${bold('What next?')}`)
-    this.log(`    ${cyan('1')}  Test a strategy on a specific pair`)
-    this.log(`    ${cyan('2')}  See which pairs work best for a strategy`)
-    this.log(`    ${cyan('3')}  Back to Explore`)
-    this.log('')
 
     const choice = await ask(`  ${cyan('>')} `)
 
@@ -1526,7 +1521,26 @@ export default class Research extends GatedCommand {
       }
     })
 
-    // Post-pipeline guidance
+    // Post-pipeline guidance. When stdin isn't a TTY (README quickstart,
+    // piped/scripted use, CI), printing an interactive menu and awaiting
+    // input either hangs forever or — with </dev/null — drops the user
+    // at an unanswerable prompt. Detect and print actionable copyable
+    // commands instead, then exit cleanly.
+    if (!process.stdin.isTTY) {
+      this.log(`  ${bold('Next steps:')}`)
+      if (finalGrade === 'A' || finalGrade === 'B') {
+        this.log(`    ${cyan(`rift algo ${strategy} --pair ${pair}`)}  ${dim('— go live with this strategy')}`)
+        this.log(`    ${cyan(`rift sweep ${strategy} --pair ${pair}`)}  ${dim('— optimize parameters')}`)
+        this.log(`    ${cyan(`rift backtest ${strategy} --all-pairs --top 10`)}  ${dim('— test other pairs')}`)
+      } else {
+        this.log(`    ${cyan(`rift sweep ${strategy} --pair ${pair}`)}  ${dim('— optimize parameters (may improve the grade)')}`)
+        this.log(`    ${cyan('rift strategies list')}  ${dim('— see all available strategies')}`)
+        this.log(`    ${cyan(`rift research ${strategy} --pair <OTHER-COIN>`)}  ${dim('— try a different pair')}`)
+      }
+      this.log('')
+      return
+    }
+
     this.log(`  ${bold('What next?')}`)
     if (finalGrade === 'A' || finalGrade === 'B') {
       this.log(`    ${cyan('1')}  Go live ${dim(`→ rift algo ${strategy} --pair ${pair}`)}`)
