@@ -1,4 +1,5 @@
 import {Args, Flags} from '@oclif/core'
+import * as path from 'node:path'
 import {GatedCommand} from '../lib/base-command.js'
 import {passthroughToEngine} from '../lib/engine-passthrough.js'
 
@@ -21,8 +22,14 @@ export default class PortfolioBacktest extends GatedCommand {
 
   async run(): Promise<void> {
     const {args, flags} = await this.parse(PortfolioBacktest)
-    const engineArgs = [args.config]
-    if (flags['strategies-dir']) engineArgs.push('--strategies-dir', flags['strategies-dir'])
+    // The engine subprocess is spawned with cwd=engine/, so relative paths
+    // in args would resolve from there instead of the user's terminal.
+    // Anchor to the user's cwd before handing the path to Python.
+    const configPath = path.resolve(args.config)
+    const engineArgs = [configPath]
+    if (flags['strategies-dir']) {
+      engineArgs.push('--strategies-dir', path.resolve(flags['strategies-dir']))
+    }
     await passthroughToEngine({
       command: 'portfolio-backtest',
       args: engineArgs,

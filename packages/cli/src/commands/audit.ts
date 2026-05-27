@@ -1,4 +1,5 @@
 import {Flags} from '@oclif/core'
+import * as path from 'node:path'
 import {GatedCommand} from '../lib/base-command.js'
 import {passthroughToEngine} from '../lib/engine-passthrough.js'
 
@@ -23,7 +24,9 @@ export default class Audit extends GatedCommand {
     const {flags} = await this.parse(Audit)
     const args = ['--export', flags.export, '--last', flags.last]
     if (flags.strategy) args.push('--strategy', flags.strategy)
-    if (flags.output) args.push('--output', flags.output)
+    // Resolve --output to an absolute path so the file lands where the user
+    // expects (their cwd), not in the engine subprocess's cwd (engine/).
+    if (flags.output) args.push('--output', path.resolve(flags.output))
     await passthroughToEngine({
       command: 'audit',
       args,

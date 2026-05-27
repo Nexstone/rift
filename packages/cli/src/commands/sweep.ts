@@ -1,4 +1,5 @@
 import {Flags, Args} from '@oclif/core'
+import * as path from 'node:path'
 import {GatedCommand} from '../lib/base-command.js'
 import {runEngine} from '../lib/python-bridge.js'
 import type {EngineMessage} from '../lib/python-bridge.js'
@@ -57,7 +58,10 @@ export default class Sweep extends GatedCommand {
       '--top', String(flags.top),
       '--rank', flags.rank!,
     ]
-    if (flags.config) engineArgs.push('--config', flags.config)
+    // Anchor relative config paths to the user's cwd — the engine
+    // subprocess runs with cwd=engine/, so a bare "strategies/.../sweep.yaml"
+    // would otherwise resolve to engine/strategies/.../sweep.yaml.
+    if (flags.config) engineArgs.push('--config', path.resolve(flags.config))
 
     await runEngine('sweep', engineArgs, (msg: EngineMessage) => {
       if (msg.type === 'progress' && msg.msg) {
