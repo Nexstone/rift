@@ -31,7 +31,7 @@ const CATALOG: Record<string, CmdEntry[]> = {
     {name: 'montecarlo', desc: 'Monte Carlo simulation', promoted: true},
     {name: 'walk-forward', desc: 'Walk-forward validation', promoted: true},
     {name: 'research', desc: 'Full research pipeline (backtest + WF + MC + gates)', promoted: true},
-    {name: 'quick-test', desc: 'Quick sanity backtest', promoted: false},
+    {name: 'quick-test', desc: 'Quick sanity backtest', promoted: true},
     {name: 'portfolio-backtest', desc: 'Multi-strategy portfolio backtest', promoted: true},
     {name: 'portfolio-matrix', desc: 'Strategy-pair correlation matrix', promoted: true},
     {name: 'cross-asset', desc: 'Cross-pair / cross-asset correlation research', promoted: true},
@@ -53,7 +53,7 @@ const CATALOG: Record<string, CmdEntry[]> = {
     {name: 'versions', desc: 'List strategy version history', promoted: false},
   ],
   'Workbench (strategy authoring)': [
-    {name: 'workbench-create', desc: 'Create a new workbench strategy', promoted: false},
+    {name: 'workbench-create', desc: 'Create a new workbench strategy', promoted: true},
     {name: 'workbench-list', desc: 'List workbench strategies', promoted: false},
     {name: 'workbench-show', desc: 'Show a workbench strategy', promoted: false},
     {name: 'workbench-update', desc: 'Update workbench config', promoted: false},
@@ -63,7 +63,7 @@ const CATALOG: Record<string, CmdEntry[]> = {
     {name: 'workbench-components', desc: 'List workbench signal components', promoted: false},
   ],
   'Data & discovery': [
-    {name: 'sync', desc: 'Sync HL S3 archive into local cache', promoted: false},
+    {name: 'sync', desc: 'Sync HL S3 archive into local cache', promoted: true},
     {name: 'fetch', desc: 'Fetch candles from HL REST API', promoted: false},
     {name: 'fetch-multi', desc: 'Fetch multiple pairs', promoted: false},
     {name: 'list-pairs', desc: 'List all HL trading pairs', promoted: false},

@@ -37,6 +37,7 @@ export default class CrossAsset extends GatedCommand {
       args,
       log: (m) => this.log(m),
       error: (m) => this.error(m),
+      exit: (c) => this.exit(c),
       jsonOnly: flags.json,
     })
   }

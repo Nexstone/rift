@@ -27,9 +27,13 @@ function gradeBadge(ratio: number): string {
 export default class WalkForward extends GatedCommand {
   static override description = 'Run walk-forward analysis to test strategy robustness'
 
+  // Engine command and docs/guide use the hyphenated form. File basename
+  // `walkforward` (one word) stays for backwards compatibility.
+  static override aliases = ['walk-forward']
+
   static override examples = [
-    '$ rift walkforward btc_funding_fade --pair BTC --tf 1h --wf 3m/1m',
-    '$ rift walkforward btc_funding_fade --pair BTC --tf 1h --wf 6m/2m',
+    '$ rift walk-forward trend_follow --pair BTC --tf 1h --wf 3m/1m',
+    '$ rift walk-forward trend_follow --pair BTC --tf 4h --wf 6m/2m',
   ]
 
   static override args = {
