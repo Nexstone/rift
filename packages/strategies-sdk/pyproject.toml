@@ -1,0 +1,23 @@
+[project]
+name = "rift-strategies-sdk"
+version = "0.1.0"
+description = "RIFT strategy SDK — scaffold tool, validator, and shipped OSS example strategies."
+license = "Apache-2.0"
+requires-python = ">=3.13"
+dependencies = [
+    "polars>=1.0",
+    "numpy>=2.0",
+    "rift-core",
+    "rift-engine-core",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rift_strategies_sdk"]
+
+[tool.uv.sources]
+rift-core = { path = "../core", editable = true }
+rift-engine-core = { path = "../engine", editable = true }

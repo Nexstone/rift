@@ -1,0 +1,119 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    name: Python (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      - name: Setup Python 3.13
+        run: uv python install 3.13
+
+      - name: Sync engine venv (installs all workspace packages)
+        working-directory: engine
+        run: uv sync
+
+      # Fast tests — unit + property + CLI smoke (skips @pytest.mark.slow).
+      # NOTE: `--project engine` (not `--directory engine`) so cwd stays at
+      # the repo root, the root pyproject.toml is picked up, and the root
+      # conftest.py is discovered for shared fixtures.
+      - name: Run pytest (fast tests only)
+        run: |
+          uv run --project engine pytest -m "not slow"
+
+      # Integration smoke — full research pipeline against the OSS
+      # reference strategy (`trend_follow`). Uses the synthetic
+      # candle+funding bundle under tests/fixtures/data/, which
+      # conftest.py installs into ~/.rift/data/ at session start.
+      # @pytest.mark.slow tests assert on real fill counts and remain
+      # CI-deferred.
+      - name: Run pytest (integration smoke against fixture bundle)
+        run: |
+          uv run --project engine pytest \
+            packages/research/tests/test_advanced.py::TestIntegrationSmoke
+
+  typescript:
+    name: TypeScript CLI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript compile check
+        working-directory: packages/cli
+        run: pnpm build
+
+  mcp-smoke:
+    name: MCP smoke (JSON-RPC over stdio)
+    needs: [python, typescript]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      - name: Setup Python 3.13
+        run: uv python install 3.13
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Sync engine venv
+        working-directory: engine
+        run: uv sync
+
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript CLI
+        working-directory: packages/cli
+        run: pnpm build
+
+      # MCP smoke is @pytest.mark.slow because it spawns a subprocess.
+      # Pass -m "slow" to opt in (the fast-tests job above skips it).
+      - name: Run MCP smoke test
+        run: |
+          uv run --project engine pytest engine/tests/test_mcp_smoke.py -m slow -v

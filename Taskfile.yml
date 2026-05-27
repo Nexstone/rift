@@ -1,0 +1,43 @@
+version: "3"
+
+tasks:
+  install:
+    desc: Install all dependencies
+    cmds:
+      - pnpm install
+      - cd engine && uv sync
+
+  build:
+    desc: Build all packages
+    cmds:
+      - pnpm -r build
+
+  dev:
+    desc: Run CLI in dev mode
+    dir: packages/cli
+    cmds:
+      - pnpm dev
+
+  test:
+    desc: Run all tests
+    cmds:
+      - pnpm -r test
+      - cd engine && uv run pytest
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - pnpm -r exec rm -rf dist
+      - cd engine && rm -rf .venv __pycache__
+
+  engine:install:
+    desc: Install Python engine only
+    dir: engine
+    cmds:
+      - uv sync
+
+  cli:install:
+    desc: Install CLI only
+    dir: packages/cli
+    cmds:
+      - pnpm install

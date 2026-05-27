@@ -1,0 +1,262 @@
+name: Release
+
+# Cuts a public release of RIFT to PyPI + npm and creates a GitHub release.
+#
+# Trigger: pushing a tag of the form `v*.*.*` (e.g. v0.1.0, v0.1.1, v0.2.0).
+# Manual trigger via workflow_dispatch is available for dry-runs that build
+# artifacts but skip the publish steps.
+#
+# Order matters:
+#   1. Test suite must pass (regression gate)
+#   2. PyPI publish FIRST  — the npm CLI shells out to Python; if PyPI doesn't
+#      have the engine when the CLI publishes, end-users hit a wall.
+#   3. npm publish SECOND — only after PyPI confirms.
+#   4. GitHub release LAST — references the now-public PyPI + npm.
+#
+# Required repo secrets:
+#   PYPI_TOKEN   — PyPI API token with upload scope for the rift-* packages
+#   NPM_TOKEN    — npm automation token with publish scope for @nexstone/*
+#                  (or whatever scope ships)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build artifacts but skip the publish steps'
+        required: false
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+permissions:
+  contents: write   # to create the GitHub Release
+
+jobs:
+
+  # ─── Regression gate ──────────────────────────────────────────────────
+  test:
+    name: Test suite (regression gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      - name: Setup Python 3.13
+        run: uv python install 3.13
+
+      - name: Sync engine venv
+        working-directory: engine
+        run: uv sync
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with: { version: 9 }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TS CLI
+        working-directory: packages/cli
+        run: pnpm build
+
+      - name: Verify integrity seal matches source
+        run: python scripts/seal_release.py --check
+
+      - name: Run pytest (fast)
+        run: uv run --project engine pytest -m "not slow and not mainnet"
+
+      - name: Run integration smoke
+        run: |
+          uv run --project engine pytest \
+            packages/research/tests/test_advanced.py::TestIntegrationSmoke
+
+      - name: Run MCP smoke
+        run: uv run --project engine pytest engine/tests/test_mcp_smoke.py -m slow
+
+  # ─── Build Python wheels for all 10 packages ──────────────────────────
+  build-python:
+    name: Build Python wheels
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+          enable-cache: true
+
+      - name: Setup Python 3.13
+        run: uv python install 3.13
+
+      # Sub-packages must publish before the meta `rift-engine` declares
+      # them as dependencies. Build them all here; publish step orders.
+      - name: Build all 10 wheels
+        run: |
+          mkdir -p dist-py
+          for d in packages/core packages/data packages/engine \
+                   packages/trade packages/portfolio packages/research \
+                   packages/api packages/strategies-sdk packages/substrate \
+                   engine; do
+            echo "::group::Build $d"
+            (cd "$d" && uv build -o "$GITHUB_WORKSPACE/dist-py")
+            echo "::endgroup::"
+          done
+          ls -la dist-py/
+
+      - name: Upload wheels artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels
+          path: dist-py/
+          retention-days: 7
+
+  # ─── Build npm tarball ────────────────────────────────────────────────
+  build-npm:
+    name: Build npm tarball
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with: { version: 9 }
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build CLI
+        working-directory: packages/cli
+        run: pnpm build
+
+      - name: Pack
+        working-directory: packages/cli
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/dist-npm"
+          pnpm pack --pack-destination "$GITHUB_WORKSPACE/dist-npm"
+          ls -la "$GITHUB_WORKSPACE/dist-npm"
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: dist-npm/
+          retention-days: 7
+
+  # ─── Publish to PyPI (gated; first because npm CLI depends on it) ─────
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build-python, build-npm]
+    runs-on: ubuntu-latest
+    # Publish only on tag push, not on manual workflow_dispatch dry-runs
+    if: startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.dry_run == 'false')
+    environment:
+      name: pypi
+      url: https://pypi.org/project/rift-engine/
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: python-wheels
+          path: dist-py
+
+      - name: Publish (sub-packages first, then meta)
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          # Sub-packages must publish before rift-engine resolves them as deps.
+          # Order: every wheel except the meta first, then the meta.
+          for f in dist-py/*.whl dist-py/*.tar.gz; do
+            case "$(basename $f)" in
+              rift_engine-*.*) continue ;;
+              *) echo "Publishing $f"; uvx --from twine twine upload --skip-existing "$f" ;;
+            esac
+          done
+          # Now the meta
+          uvx --from twine twine upload --skip-existing dist-py/rift_engine-*
+
+  # ─── Publish to npm ───────────────────────────────────────────────────
+  publish-npm:
+    name: Publish to npm
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.dry_run == 'false')
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@nexstone/rift-cli
+    steps:
+      - name: Download tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-tarball
+          path: dist-npm
+
+      - name: Setup Node 20 + npm registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm publish dist-npm/*.tgz --access public
+
+  # ─── Create GitHub Release ────────────────────────────────────────────
+  github-release:
+    name: GitHub Release
+    needs: [publish-pypi, publish-npm]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Extract changelog section for this tag
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          # Extract the section between `## [VERSION]` and the next `## [`
+          awk -v v="$VERSION" '
+            /^## \[/{ in_section = (index($0, "[" v "]") || index($0, "[Unreleased]")) ; next }
+            in_section { print }
+          ' CHANGELOG.md > release-notes.md
+          echo "Notes for $TAG:"
+          head -40 release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          files: |
+            artifacts/python-wheels/*
+            artifacts/npm-tarball/*
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') || contains(github.ref, '-alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,49 @@
+{
+  "name": "@nexstone/rift-cli",
+  "version": "0.1.0",
+  "description": "RIFT — Research / Iteration / Forecast / Trade",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "rift": "./bin/run.js"
+  },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@oclif/core": "^4",
+    "@oclif/plugin-help": "^6",
+    "@walletconnect/sign-client": "^2.23.9",
+    "@walletconnect/types": "^2.23.9",
+    "chalk": "^5",
+    "qrcode-terminal": "^0.12.0",
+    "viem": "^2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.7"
+  },
+  "oclif": {
+    "bin": "rift",
+    "dirname": "rift",
+    "commands": "./dist/commands",
+    "default": "home",
+    "plugins": [
+      "@oclif/plugin-help"
+    ],
+    "topicSeparator": " "
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

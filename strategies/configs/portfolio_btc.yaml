@@ -1,0 +1,26 @@
+# RIFT Portfolio Configuration — example
+#
+# Run multiple strategies simultaneously with capital allocation and risk management.
+# This example uses the OSS reference strategy (trend_follow) as the only entry.
+# trend_follow is shipped as a learning template — see its docstring before deploying
+# real capital. Add your own strategies as additional list items.
+
+initial_equity: 10000
+
+strategies:
+  - name: trend_follow
+    pair: BTC-PERP
+    timeframe: 4h
+    allocation: 1.0       # 100% of capital — only strategy in this example
+
+  # Example: add your own strategies here. Allocations must sum to 1.0.
+  # - name: my_momentum_strategy
+  #   pair: ETH-PERP
+  #   timeframe: 4h
+  #   allocation: 0.5
+
+risk:
+  max_portfolio_drawdown: 0.15    # reduce exposure if portfolio drops 15%
+  max_strategy_drawdown: 0.07     # disable strategy if it drops 7%
+  kill_switch_drawdown: 0.20      # close everything if portfolio drops 20%
+  max_gross_exposure: 3.0         # max 300% gross exposure

@@ -1,0 +1,22 @@
+[project]
+name = "rift-api"
+version = "0.1.0"
+description = "HTTP REST API server for RIFT — exposes state files for institutional dashboards and PMS integrations."
+license = "Apache-2.0"
+requires-python = ">=3.13"
+dependencies = [
+    "polars>=1.0",
+    "rift-core",
+    "rift-data",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rift_api"]
+
+[tool.uv.sources]
+rift-core = { path = "../core", editable = true }
+rift-data = { path = "../data", editable = true }

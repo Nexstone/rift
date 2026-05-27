@@ -1,0 +1,52 @@
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+.next/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.eggs/
+
+# Data cache (top-level only)
+/data/
+
+# Internal scrapers (Mac Mini only, not part of the product)
+scrapers/
+
+# Credentials & secrets
+.rift/
+.env
+*.env
+.env.*
+!.env.example
+credentials
+credentials.*
+*.pem
+*.key
+!*.public.key
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.p12
+*.pfx
+.aws/
+.gnupg/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build
+*.tgz

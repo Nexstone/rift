@@ -1,0 +1,19 @@
+# Internal tooling — not part of the npm package
+scrapers/
+engine/.venv/
+engine/**/__pycache__/
+
+# Dev files
+.github/
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Data cache
+/data/
+.rift/
+
+# OS
+.DS_Store
+Thumbs.db

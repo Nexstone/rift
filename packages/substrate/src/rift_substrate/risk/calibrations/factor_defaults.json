@@ -1,0 +1,32 @@
+{
+  "_about": "Default parameters for the Liu-Tsyvinski-Wu (2022) 3-factor crypto model. These are starting points — power users override per-factor via the Factor constructors.",
+  "_source": "Liu, Tsyvinski & Wu (2022). 'Common Risk Factors in Cryptocurrency'. Journal of Finance.",
+  "_updated": "2026-05-19",
+
+  "market": {
+    "min_coins_per_period": 5,
+    "weighting": "volume_weighted",
+    "notes": "Falls back to equal-weight if panel.volumes is None."
+  },
+
+  "size": {
+    "lookback_periods": 30,
+    "quantile": 0.3,
+    "min_valid_coins": 10,
+    "notes": "Long bottom 30% by trailing 30-period avg volume, short top 30%."
+  },
+
+  "momentum": {
+    "lookback_periods": 30,
+    "skip_periods": 7,
+    "quantile": 0.2,
+    "min_valid_coins": 10,
+    "notes": "Long top 20% by 30-period past return (excluding most recent 7 periods), short bottom 20%."
+  },
+
+  "regression": {
+    "newey_west_lag_rule": "auto",
+    "default_use_robust": false,
+    "notes": "Auto NW lag = floor(4 * (n/100)^(2/9)) per Newey-West (1994). Set use_robust=True for Huber+NW on fat-tailed strategies."
+  }
+}

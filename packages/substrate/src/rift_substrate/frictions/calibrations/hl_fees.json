@@ -1,0 +1,30 @@
+{
+  "_about": "Hyperliquid fee schedule (base fees, before builder fee). Tiered by 14-day trading volume. Users SHOULD verify against the current published schedule at https://hyperliquid.gitbook.io/hyperliquid-docs/trading/fees before relying on these for live PnL accuracy.",
+  "_source": "Hyperliquid public docs as of 2025-Q4. Verify before each release.",
+  "_updated": "2026-05-19",
+
+  "perp_tiers": [
+    {"min_14d_volume_usd": 0,           "maker_bps": 1.5,  "taker_bps": 4.5},
+    {"min_14d_volume_usd": 5000000,     "maker_bps": 1.2,  "taker_bps": 4.0},
+    {"min_14d_volume_usd": 25000000,    "maker_bps": 0.8,  "taker_bps": 3.5},
+    {"min_14d_volume_usd": 100000000,   "maker_bps": 0.4,  "taker_bps": 3.0},
+    {"min_14d_volume_usd": 500000000,   "maker_bps": 0.0,  "taker_bps": 2.8},
+    {"min_14d_volume_usd": 2000000000,  "maker_bps": -0.1, "taker_bps": 2.4}
+  ],
+
+  "spot_tiers": [
+    {"min_14d_volume_usd": 0,           "maker_bps": 4.0,  "taker_bps": 7.0},
+    {"min_14d_volume_usd": 5000000,     "maker_bps": 3.5,  "taker_bps": 6.0},
+    {"min_14d_volume_usd": 25000000,    "maker_bps": 3.0,  "taker_bps": 5.0},
+    {"min_14d_volume_usd": 100000000,   "maker_bps": 2.0,  "taker_bps": 4.5},
+    {"min_14d_volume_usd": 500000000,   "maker_bps": 1.5,  "taker_bps": 4.0},
+    {"min_14d_volume_usd": 2000000000,  "maker_bps": 0.0,  "taker_bps": 3.5}
+  ],
+
+  "builder_fee_bps": {
+    "perp": 3.0,
+    "spot": 100.0
+  },
+
+  "builder_address": "0x0916EAb573817F02b96665386c944e297A765d7C"
+}

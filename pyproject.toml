@@ -1,0 +1,22 @@
+[tool.pytest.ini_options]
+# Repo-wide pytest config — makes /Users/milliondollaroffice/rift the rootdir
+# so the top-level conftest.py is discovered by every collected test.
+testpaths = [
+    "engine/tests",
+    "engine/tests/integration",
+    "packages/core/tests",
+    "packages/data/tests",
+    "packages/engine/tests",
+    "packages/trade/tests",
+    "packages/portfolio/tests",
+    "packages/research/tests",
+    "packages/strategies-sdk/tests",
+    "packages/substrate/tests",
+]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: tests that take >1s (real data, network, subprocess)",
+    "regression: locks behavior; failure = unexpected change in numeric output",
+    "mainnet: would touch real funds — must be opted into explicitly",
+]

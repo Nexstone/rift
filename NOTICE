@@ -1,0 +1,108 @@
+RIFT — Research / Iteration / Forecast / Trade
+Copyright 2026 Nexstone Capital
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+================================================================================
+THIRD-PARTY ATTRIBUTIONS
+================================================================================
+
+This product redistributes and depends on the following third-party software.
+Each dependency retains its original license; this NOTICE acknowledges the
+work of those projects. A full machine-readable dependency listing is
+available via:
+
+    Python:   uv pip list  (resolved against engine/uv.lock)
+    Node:     pnpm licenses list
+
+Notable redistributed components:
+
+- Hyperliquid Python SDK
+    https://github.com/hyperliquid-dex/hyperliquid-python-sdk  (MIT)
+
+- Polars
+    https://github.com/pola-rs/polars  (MIT)
+
+- NumPy
+    https://numpy.org  (BSD-3-Clause)
+
+- pandas
+    https://pandas.pydata.org  (BSD-3-Clause)
+
+- scikit-learn
+    https://scikit-learn.org  (BSD-3-Clause)
+
+- statsmodels
+    https://www.statsmodels.org  (BSD-3-Clause)
+
+- SciPy
+    https://scipy.org  (BSD-3-Clause)
+
+- PyArrow / Apache Arrow
+    https://arrow.apache.org  (Apache-2.0)
+
+- Typer / Click
+    https://typer.tiangolo.com  (MIT)
+
+- Rich
+    https://rich.readthedocs.io  (MIT)
+
+- Pydantic
+    https://pydantic.dev  (MIT)
+
+- structlog
+    https://www.structlog.org  (Apache-2.0 / MIT dual-licensed)
+
+- Optuna
+    https://optuna.org  (MIT)
+
+- XGBoost
+    https://xgboost.ai  (Apache-2.0)
+
+- arch (econometrics)
+    https://arch.readthedocs.io  (NCSA)
+
+- ruptures
+    https://github.com/deepcharles/ruptures  (BSD-2-Clause)
+
+- hmmlearn
+    https://github.com/hmmlearn/hmmlearn  (BSD-3-Clause)
+
+- boto3 / botocore
+    https://aws.amazon.com/sdk-for-python  (Apache-2.0)
+
+- @modelcontextprotocol/sdk
+    https://modelcontextprotocol.io  (MIT)
+
+- @oclif/core
+    https://oclif.io  (MIT)
+
+- WalletConnect SDK (@walletconnect/sign-client)
+    https://walletconnect.com  (Apache-2.0)
+
+- viem
+    https://viem.sh  (MIT)
+
+- zod
+    https://zod.dev  (MIT)
+
+- chalk
+    https://github.com/chalk/chalk  (MIT)
+
+- TypeScript
+    https://www.typescriptlang.org  (Apache-2.0)
+
+================================================================================
+
+If you redistribute RIFT or a derivative work, you must propagate this NOTICE
+along with the LICENSE file, per Apache 2.0 §4(d).

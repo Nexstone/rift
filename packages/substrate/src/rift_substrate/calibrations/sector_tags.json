@@ -1,0 +1,47 @@
+{
+  "BTC":   ["L1", "Store of Value"],
+  "ETH":   ["L1", "Smart Contract"],
+  "SOL":   ["L1", "Smart Contract"],
+  "BNB":   ["L1", "Exchange"],
+  "AVAX":  ["L1", "Smart Contract"],
+  "NEAR":  ["L1", "Smart Contract"],
+  "ADA":   ["L1", "Smart Contract"],
+  "SUI":   ["L1", "Smart Contract"],
+  "APT":   ["L1", "Smart Contract"],
+  "HYPE":  ["DeFi", "DEX", "Exchange Token"],
+  "ARB":   ["L2", "Ethereum L2"],
+  "OP":    ["L2", "Ethereum L2"],
+
+  "DOGE":  ["Meme"],
+  "SHIB":  ["Meme"],
+  "kPEPE": ["Meme"],
+  "kSHIB": ["Meme"],
+  "FARTCOIN": ["Meme"],
+  "WIF":   ["Meme"],
+  "BONK":  ["Meme"],
+  "POPCAT": ["Meme"],
+
+  "LINK":  ["DeFi", "Oracle"],
+  "UNI":   ["DeFi", "DEX"],
+  "AAVE":  ["DeFi", "Lending"],
+  "CRV":   ["DeFi", "DEX"],
+  "LDO":   ["DeFi", "Liquid Staking"],
+  "DYDX":  ["DeFi", "DEX"],
+  "GMX":   ["DeFi", "DEX"],
+  "ENA":   ["DeFi", "Stablecoin"],
+
+  "FET":   ["AI"],
+  "RNDR":  ["AI", "Compute"],
+  "TAO":   ["AI"],
+  "WLD":   ["AI", "Identity"],
+
+  "XRP":   ["Payments"],
+  "LTC":   ["Payments"],
+  "BCH":   ["Payments"],
+  "DASH":  ["Payments"],
+
+  "APE":   ["Gaming", "NFT"],
+  "AXS":   ["Gaming"],
+  "SAND":  ["Gaming", "Metaverse"],
+  "MANA":  ["Gaming", "Metaverse"]
+}

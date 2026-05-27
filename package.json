@@ -1,0 +1,9 @@
+{
+  "name": "rift",
+  "private": true,
+  "description": "Research / Iteration / Forecast / Trade — open-source strategy lifecycle CLI",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
