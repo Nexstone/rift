@@ -20,7 +20,7 @@ from rift.commands._shared import app, _emit, _hint, _sanitize_for_json
 @app.command("workbench-create")
 def workbench_create(
     strategy_name: str = typer.Argument(..., help="Name for the new strategy"),
-    template: str = typer.Option("blank", "--template", help="Template: funding, vwap_reversion, trend_follow, blank"),
+    template: str = typer.Option("blank", "--template", help="Template: blank, single_signal_example"),
 ) -> None:
     """Create a new custom strategy from a template."""
     from rift.workbench import create_from_template, generate_and_save, list_configs

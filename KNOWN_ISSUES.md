@@ -88,9 +88,9 @@ Walk-forward validation reduces overfitting risk but does not eliminate it. A st
 
 ### Single-binary installers not yet available
 
-For v0.1, RIFT installs from source: `git clone` + `uv sync` + `pnpm install`. Future releases will offer Homebrew (macOS), `pip install rift-engine` (PyPI), and `npm install -g @rift/cli` (npm) as one-line install paths.
+For v0.1, RIFT installs from source: `git clone` + `uv sync` + `pnpm install`. Future releases will offer Homebrew (macOS), `pip install rift-engine` (PyPI), and `npm install -g @nexstone/rift-cli` (npm) as one-line install paths.
 
-Until then, follow the install instructions in [`README.md`](README.md).
+Until then, follow the install instructions in [`README.md`](README.md) or [`docs/INSTALL.md`](docs/INSTALL.md).
 
 ### No published Docker image yet
 
@@ -98,8 +98,20 @@ A maintained Dockerfile is planned but not yet shipped. If you build one, please
 
 ## Documentation
 
-### Documentation is sparse for v0.1
+### v0.1 documentation set
 
-Detailed docs exist for the auth + execution model (`docs/AUTH_AND_EXECUTION.md`) and the signal library (`engine/SIGNALS.md`). Quickstart, MCP setup, strategy authoring, and methodology docs are planned for `v0.2` but not in `v0.1`.
+The following docs ship in v0.1 and are the canonical references:
 
-If you hit a wall on something the docs don't cover, open an issue — we'll prioritize docs based on what users are actually missing.
+- [`docs/QUICKSTART.md`](docs/QUICKSTART.md) — 10-minute path from clone to a sealed research bundle
+- [`docs/INSTALL.md`](docs/INSTALL.md) — full install for macOS, Ubuntu/Debian, WSL2
+- [`docs/strategies/AUTHORING.md`](docs/strategies/AUTHORING.md) — write a Python strategy from scratch with the SDK
+- [`docs/signals/AUTHORING.md`](docs/signals/AUTHORING.md) — add custom scout signals via the `@signal` decorator
+- [`docs/research/METHODOLOGY.md`](docs/research/METHODOLOGY.md) — what the 14 research stages compute and what they can't protect against
+- [`docs/mcp/SETUP.md`](docs/mcp/SETUP.md) — wire RIFT into Claude Desktop / Claude Code / Cursor as an MCP server
+- [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) — auto-generated per-command help (regenerate via `scripts/gen_cli_reference.sh`)
+- [`docs/AUTH_AND_EXECUTION.md`](docs/AUTH_AND_EXECUTION.md) — three-layer key model, capability tiers, audit substrate
+- [`docs/BACKUP_AND_STATE.md`](docs/BACKUP_AND_STATE.md) — what's in `~/.rift/`, backup strategies, machine-to-machine migration
+- [`docs/RUNBOOK_ALGO_MONITORING.md`](docs/RUNBOOK_ALGO_MONITORING.md) — daily/weekly checks for a long-running algo daemon
+- [`engine/SIGNALS.md`](engine/SIGNALS.md) — indicator + signal library reference (38 signals across 9 categories)
+
+If something is missing or unclear, open an issue — we'll prioritize gaps based on what users actually hit.
