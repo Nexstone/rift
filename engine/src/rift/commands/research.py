@@ -452,7 +452,15 @@ def walk_forward(
     strategy_name: str = typer.Argument(..., help="Strategy name"),
     pair: str = typer.Option("BTC", "--pair", help="Trading pair"),
     interval: str = typer.Option("1h", "--tf", "--interval", help="Candle interval"),
-    config: str = typer.Option("3m/1m", "--wf", help="Walk-forward config: train/test (e.g. 3m/1m)"),
+    config: str = typer.Option(
+        "",
+        "--wf",
+        help=(
+            "Walk-forward config: train/test (e.g. 6m/3m). "
+            "Empty = use the strategy's recommended_train_months / "
+            "recommended_test_months (falls back to 3m/1m if unset)."
+        ),
+    ),
     equity: float = typer.Option(10000.0, "--equity", help="Starting equity per window"),
     leverage: float = typer.Option(1.0, "--leverage", help="Leverage multiplier"),
     strategies_dir: str = typer.Option("", "--strategies-dir", help="Directory with strategy .py files"),
@@ -475,6 +483,24 @@ def walk_forward(
         _emit({"type": "error", "msg": str(e).strip('"')})
         sys.exit(1)
     strategy = strategy_cls()
+
+    # Resolve config: empty = use strategy's declared recommendation.
+    # Strategies with long-warmup indicators (e.g. trend_follow's 200-EMA)
+    # need wider train/test windows than the framework default. If the
+    # strategy declares `recommended_train_months` / `recommended_test_months`,
+    # honor those when the user didn't pass --wf explicitly.
+    if not config:
+        rec_train = getattr(strategy_cls, "recommended_train_months", None)
+        rec_test = getattr(strategy_cls, "recommended_test_months", None)
+        if rec_train is not None and rec_test is not None:
+            config = f"{rec_train}m/{rec_test}m"
+            _emit({
+                "type": "status",
+                "msg": f"Using {strategy_name}'s recommended windows: {config} "
+                       f"(set --wf to override).",
+            })
+        else:
+            config = "3m/1m"
 
     # Parse config
     try:

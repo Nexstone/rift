@@ -43,7 +43,13 @@ export default class WalkForward extends GatedCommand {
   static override flags = {
     pair: Flags.string({description: 'Trading pair', default: 'BTC-PERP'}),
     tf: Flags.string({description: 'Timeframe', default: '1h'}),
-    wf: Flags.string({description: 'Walk-forward config: train/test (e.g. 3m/1m)', default: '3m/1m'}),
+    wf: Flags.string({
+      description:
+        "Walk-forward config: train/test (e.g. 6m/3m). " +
+        "Default uses the strategy's recommended_train_months / " +
+        "recommended_test_months (or 3m/1m if unset).",
+      default: '',
+    }),
     equity: Flags.integer({description: 'Starting equity per window', default: 10000}),
     leverage: Flags.integer({description: 'Leverage multiplier', default: 1}),
   }
@@ -53,17 +59,22 @@ export default class WalkForward extends GatedCommand {
 
     this.log('')
     this.log(`  ${bold('Walk-Forward Analysis')}`)
-    this.log(`  ${dim(`${args.strategy} on ${flags.pair} ${flags.tf} — ${flags.wf} windows`)}`)
+    const wfDisplay = flags.wf || "strategy default"
+    this.log(`  ${dim(`${args.strategy} on ${flags.pair} ${flags.tf} — ${wfDisplay} windows`)}`)
     this.log('')
 
     const engineArgs: string[] = [
       args.strategy,
       '--pair', flags.pair!,
       '--tf', flags.tf!,
-      '--wf', flags.wf!,
       '--equity', String(flags.equity),
       '--leverage', String(flags.leverage),
     ]
+    // Only forward --wf when the user actually passed one. Otherwise let
+    // the engine pick the strategy's recommended_train_months / _test_months.
+    if (flags.wf) {
+      engineArgs.push('--wf', flags.wf)
+    }
 
     await runEngine('walk-forward', engineArgs, (msg: EngineMessage) => {
       if (msg.type === 'progress' && msg.msg) {
