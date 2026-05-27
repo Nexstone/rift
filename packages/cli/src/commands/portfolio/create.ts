@@ -33,7 +33,7 @@ export default class PortfolioCreate extends GatedCommand {
   // shows only OSS-shipped strategies; user's workbench customs are added
   // at runtime by the picker.
   private readonly availableStrategies = [
-    {name: 'btc_funding_fade', grade: 'C', desc: 'Fade extreme funding on BTC perp (OSS worked example)'},
+    {name: 'trend_follow', grade: 'C', desc: 'Bidirectional EMA-crossover trend follower (OSS demo strategy)'},
   ]
 
   async run(): Promise<void> {

@@ -21,9 +21,9 @@ export default class Sweep extends GatedCommand {
   static override description = 'Run a parameter sweep to find optimal strategy settings'
 
   static override examples = [
-    '$ rift sweep btc_funding_fade --pair BTC --tf 1h',
-    '$ rift sweep btc_funding_fade --config strategies/btc_funding_fade/sweep.yaml',
-    '$ rift sweep btc_funding_fade --pair BTC --rank sharpe --top 5',
+    '$ rift sweep trend_follow --pair BTC --tf 4h',
+    '$ rift sweep my_strategy --config strategies/my_strategy/sweep.yaml',
+    '$ rift sweep trend_follow --pair BTC --tf 4h --rank sharpe --top 5',
   ]
 
   static override args = {

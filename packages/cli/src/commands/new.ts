@@ -176,7 +176,7 @@ Describe your strategy logic here.
 ## Usage
 \`\`\`bash
 rift backtest ${name} --pair BTC --tf 1h
-rift compare ${name},btc_funding_fade --pair BTC --tf 1h
+rift compare ${name},trend_follow --pair BTC --tf 4h
 \`\`\`
 `
 

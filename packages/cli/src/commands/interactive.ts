@@ -116,7 +116,7 @@ export default class Interactive extends GatedCommand {
   }
 
   private async interactiveBacktest(): Promise<void> {
-    const strategy = await ask(`  ${cyan('Strategy name')} ${dim('(e.g. btc_funding_fade, or run rift strategies to see all)')}: `)
+    const strategy = await ask(`  ${cyan('Strategy name')} ${dim('(e.g. trend_follow, or run rift strategies to see all)')}: `)
     if (!strategy) {
       console.log(dim('  Cancelled — no strategy name given.'))
       return
@@ -130,7 +130,7 @@ export default class Interactive extends GatedCommand {
   }
 
   private async interactiveCompare(): Promise<void> {
-    const input = await ask(`  ${cyan('Strategies')} ${dim('(comma-separated, e.g. btc_funding_fade,my_strategy)')}: `)
+    const input = await ask(`  ${cyan('Strategies')} ${dim('(comma-separated, e.g. trend_follow,my_strategy)')}: `)
     if (!input) {
       console.log(dim('  Cancelled — no strategies given.'))
       return

@@ -26,7 +26,7 @@ export default class Compare extends GatedCommand {
   static override description = 'Compare multiple strategies head-to-head'
 
   static override examples = [
-    '$ rift compare btc_funding_fade,my_strategy --pair BTC',
+    '$ rift compare trend_follow,my_strategy --pair BTC --tf 4h',
   ]
 
   static override args = {

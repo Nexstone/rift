@@ -25,7 +25,7 @@ export default class Backtest extends GatedCommand {
   static override description = 'Run a backtest on cached candle data'
 
   static override examples = [
-    '$ rift backtest btc_funding_fade --pair BTC --tf 1h',
+    '$ rift backtest trend_follow --pair BTC --tf 4h',
     '$ rift backtest my_strategy --pair BTC --tf 1h --equity 50000',
   ]
 

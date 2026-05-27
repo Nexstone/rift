@@ -113,7 +113,7 @@ export default class Init extends GatedCommand {
     // Step 4: Run a quick backtest
     this.log(`  ${dim('4/4')} Running sample backtest...`)
     try {
-      await runEngine('backtest', ['btc_funding_fade', '--pair', 'BTC', '--tf', '1h'], (msg: EngineMessage) => {
+      await runEngine('backtest', ['trend_follow', '--pair', 'BTC', '--tf', '4h'], (msg: EngineMessage) => {
         if (msg.type === 'result') {
           const ret = msg.total_return_pct as number
           const trades = msg.num_trades as number
@@ -121,7 +121,7 @@ export default class Init extends GatedCommand {
         }
       })
     } catch {
-      this.log(`  ${yellow('!')} Backtest skipped. Run manually: rift backtest btc_funding_fade --pair BTC --tf 1h`)
+      this.log(`  ${yellow('!')} Backtest skipped. Run manually: rift backtest trend_follow --pair BTC --tf 4h`)
     }
 
     this.log('')
@@ -129,11 +129,11 @@ export default class Init extends GatedCommand {
     this.log(`  ${green('✔')} ${bold('RIFT is ready.')}`)
     this.log('')
     this.log(`  ${dim('Try these commands:')}`)
-    this.log(`    ${cyan('rift strategies list')}          ${dim('— see available strategies')}`)
-    this.log(`    ${cyan('rift backtest btc_funding_fade --pair BTC')}  ${dim('— run a backtest')}`)
-    this.log(`    ${cyan('rift guide')}                     ${dim('— 9-step research-to-trade journey')}`)
-    this.log(`    ${cyan('rift new my-strategy')}          ${dim('— create your own')}`)
-    this.log(`    ${cyan('rift doctor')}                   ${dim('— check system health')}`)
+    this.log(`    ${cyan('rift strategies list')}             ${dim('— see available strategies')}`)
+    this.log(`    ${cyan('rift backtest trend_follow --pair BTC --tf 4h')}  ${dim('— run a backtest')}`)
+    this.log(`    ${cyan('rift guide')}                        ${dim('— 9-step research-to-trade journey')}`)
+    this.log(`    ${cyan('rift new my-strategy')}              ${dim('— create your own')}`)
+    this.log(`    ${cyan('rift doctor')}                       ${dim('— check system health')}`)
     this.log('')
   }
 }

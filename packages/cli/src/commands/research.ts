@@ -327,7 +327,7 @@ export default class Research extends GatedCommand {
       this.log('')
       this.log(`  ${dim('Get started:')}`)
       this.log(`    ${cyan('rift new my-strategy')}                  ${dim('— scaffold from template')}`)
-      this.log(`    ${cyan('rift backtest btc_funding_fade --pair BTC --tf 1h')}  ${dim('— try the shipped example')}`)
+      this.log(`    ${cyan('rift backtest trend_follow --pair BTC --tf 4h')}  ${dim('— try the shipped example')}`)
       this.log('')
     } else {
       if (registered.length > 0) {

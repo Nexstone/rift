@@ -57,7 +57,7 @@ export default class Algo extends GatedCommand {
   static override description = 'Algo trading — run automated strategies on Hyperliquid with real orders'
 
   static override examples = [
-    '$ rift algo btc_funding_fade --pair BTC',
+    '$ rift algo trend_follow --pair BTC --tf 4h',
     '$ rift algo status',
     '$ rift algo stop',
   ]
@@ -204,7 +204,7 @@ export default class Algo extends GatedCommand {
         }).then(resolve).catch(reject)
       })
     } catch {
-      strategies = [{name: 'btc_funding_fade', desc: 'Fade extreme funding on BTC perp (worked example)', grade: 'C'}]
+      strategies = [{name: 'trend_follow', desc: 'Bidirectional EMA-crossover trend follower (OSS demo strategy)', grade: 'C'}]
     }
 
     this.log('')

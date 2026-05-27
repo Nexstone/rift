@@ -92,7 +92,7 @@ export default class AuthStatus extends GatedCommand {
       this.log(`    ${cyan('rift agent-pair --local-main-key <0x...>')}`)
       this.log('')
       this.log(`  ${dim('Or stay in research-only mode (no wallet, no live trading):')}`)
-      this.log(`    ${cyan('rift backtest btc_funding_fade --pair BTC')}`)
+      this.log(`    ${cyan('rift backtest trend_follow --pair BTC --tf 4h')}`)
       this.log('')
       return
     }

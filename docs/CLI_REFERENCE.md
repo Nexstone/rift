@@ -70,20 +70,28 @@ COMMANDS
                       portfolio.yaml
   portfolio-matrix    Strategy × pair P&L matrix, correlation matrix, and regime
                       analysis
+  quick-test          Fast backtest with delta comparison to the last run — the
+                      core iteration loop while tuning a strategy.
   research            Research Lab — discover, test, build, optimize, and
                       compare strategies
   scout               Scan the market and find trading opportunities ranked by
                       confluence
   serve               Start RIFT as an MCP server for AI agent integration
   sweep               Run a parameter sweep to find optimal strategy settings
+  sync                Sync historical OHLCV + funding data from the Hyperliquid
+                      S3 archive. Requires AWS credentials (free tier; ~$2 for
+                      the full download).
   test-trade          Place a minimum-size test trade to verify exchange
                       connectivity
   trade               Place a manual trade with stop loss and live monitoring
   transfer            Transfer USDC between spot and perps on Hyperliquid
   verify              Verify a strategy beats buy-and-hold over a date range —
                       sanity check before going live
+  walk-forward        Run walk-forward analysis to test strategy robustness
   walkforward         Run walk-forward analysis to test strategy robustness
   withdraw            Withdraw USDC from Hyperliquid to Arbitrum
+  workbench-create    Create a new custom strategy from a workbench template
+                      (config-as-data — no Python required).
 
 ```
 
@@ -113,7 +121,7 @@ DESCRIPTION
   Algo trading — run automated strategies on Hyperliquid with real orders
 
 EXAMPLES
-  $ rift algo btc_funding_fade --pair BTC
+  $ rift algo trend_follow --pair BTC --tf 4h
 
   $ rift algo status
 
@@ -216,7 +224,7 @@ DESCRIPTION
   Run a backtest on cached candle data
 
 EXAMPLES
-  $ rift backtest btc_funding_fade --pair BTC --tf 1h
+  $ rift backtest trend_follow --pair BTC --tf 4h
 
   $ rift backtest my_strategy --pair BTC --tf 1h --equity 50000
 
@@ -244,7 +252,7 @@ DESCRIPTION
   Compare multiple strategies head-to-head
 
 EXAMPLES
-  $ rift compare btc_funding_fade,my_strategy --pair BTC
+  $ rift compare trend_follow,my_strategy --pair BTC --tf 4h
 
 ```
 
@@ -500,20 +508,28 @@ COMMANDS
                       portfolio.yaml
   portfolio-matrix    Strategy × pair P&L matrix, correlation matrix, and regime
                       analysis
+  quick-test          Fast backtest with delta comparison to the last run — the
+                      core iteration loop while tuning a strategy.
   research            Research Lab — discover, test, build, optimize, and
                       compare strategies
   scout               Scan the market and find trading opportunities ranked by
                       confluence
   serve               Start RIFT as an MCP server for AI agent integration
   sweep               Run a parameter sweep to find optimal strategy settings
+  sync                Sync historical OHLCV + funding data from the Hyperliquid
+                      S3 archive. Requires AWS credentials (free tier; ~$2 for
+                      the full download).
   test-trade          Place a minimum-size test trade to verify exchange
                       connectivity
   trade               Place a manual trade with stop loss and live monitoring
   transfer            Transfer USDC between spot and perps on Hyperliquid
   verify              Verify a strategy beats buy-and-hold over a date range —
                       sanity check before going live
+  walk-forward        Run walk-forward analysis to test strategy robustness
   walkforward         Run walk-forward analysis to test strategy robustness
   withdraw            Withdraw USDC from Hyperliquid to Arbitrum
+  workbench-create    Create a new custom strategy from a workbench template
+                      (config-as-data — no Python required).
 
 ```
 
@@ -631,9 +647,9 @@ DESCRIPTION
   Run Monte Carlo simulation to test how much of your backtest was luck vs edge
 
 EXAMPLES
-  $ rift montecarlo btc_funding_fade --pair BTC --tf 1h
+  $ rift montecarlo trend_follow --pair BTC --tf 4h
 
-  $ rift montecarlo btc_funding_fade --pair BTC --runs 50000
+  $ rift montecarlo trend_follow --pair BTC --tf 4h --runs 50000
 
 ```
 
@@ -802,6 +818,38 @@ EXAMPLES
 
 ```
 
+### `rift quick-test`
+
+```
+Fast backtest with delta comparison to the last run — the core iteration loop while tuning a strategy.
+
+USAGE
+  $ rift quick-test STRATEGY [--pair <value>] [--tf <value>] [--equity
+    <value>] [--leverage <value>] [--change <value>] [--json]
+
+ARGUMENTS
+  STRATEGY  Strategy name
+
+FLAGS
+  --change=<value>    Description of what changed (recorded in the delta
+                      history)
+  --equity=<value>    [default: 10000] Starting equity
+  --json              Emit raw JSON only
+  --leverage=<value>  [default: 1] Leverage multiplier
+  --pair=<value>      [default: BTC] Trading pair
+  --tf=<value>        Timeframe (auto from config if empty)
+
+DESCRIPTION
+  Fast backtest with delta comparison to the last run — the core iteration loop
+  while tuning a strategy.
+
+EXAMPLES
+  $ rift quick-test trend_follow --pair BTC
+
+  $ rift quick-test trend_follow --pair ETH --tf 4h --change "tightened stop to 1.5%"
+
+```
+
 ### `rift research`
 
 ```
@@ -908,11 +956,47 @@ DESCRIPTION
   Run a parameter sweep to find optimal strategy settings
 
 EXAMPLES
-  $ rift sweep btc_funding_fade --pair BTC --tf 1h
+  $ rift sweep trend_follow --pair BTC --tf 4h
 
-  $ rift sweep btc_funding_fade --config strategies/btc_funding_fade/sweep.yaml
+  $ rift sweep my_strategy --config strategies/my_strategy/sweep.yaml
 
-  $ rift sweep btc_funding_fade --pair BTC --rank sharpe --top 5
+  $ rift sweep trend_follow --pair BTC --tf 4h --rank sharpe --top 5
+
+```
+
+### `rift sync`
+
+```
+Sync historical OHLCV + funding data from the Hyperliquid S3 archive. Requires AWS credentials (free tier; ~$2 for the full download).
+
+USAGE
+  $ rift sync [--coins <value>] [--tf <value>] [--start <value>]
+    [--end <value>] [--no-funding] [--full] [--aws-key <value>] [--aws-secret
+    <value>] [--json]
+
+FLAGS
+  --aws-key=<value>     AWS Access Key ID (for non-interactive setup)
+  --aws-secret=<value>  AWS Secret Access Key
+  --coins=<value>       Comma-separated coins (empty = auto-detect from
+                        registered strategies)
+  --end=<value>         End date YYYY-MM-DD (default: today)
+  --full                Full sync (ignore incremental cache)
+  --json                Emit raw JSON only
+  --no-funding          Skip funding rate sync
+  --start=<value>       [default: 2023-09-01] Start date YYYY-MM-DD
+  --tf=<value>          [default: 5m,15m,1h,4h] Comma-separated timeframes to
+                        build
+
+DESCRIPTION
+  Sync historical OHLCV + funding data from the Hyperliquid S3 archive. Requires
+  AWS credentials (free tier; ~$2 for the full download).
+
+EXAMPLES
+  $ rift sync --coins BTC --tf 1h,4h
+
+  $ rift sync --coins BTC,ETH,SOL --tf 5m,15m,1h,4h --start 2024-01-01
+
+  $ rift sync --aws-key AKIA... --aws-secret ... --coins BTC --tf 1h
 
 ```
 
@@ -1017,6 +1101,39 @@ EXAMPLES
 
 ```
 
+### `rift walk-forward`
+
+```
+Run walk-forward analysis to test strategy robustness
+
+USAGE
+  $ rift walk-forward STRATEGY [--pair <value>] [--tf <value>] [--wf
+    <value>] [--equity <value>] [--leverage <value>]
+
+ARGUMENTS
+  STRATEGY  Strategy name
+
+FLAGS
+  --equity=<value>    [default: 10000] Starting equity per window
+  --leverage=<value>  [default: 1] Leverage multiplier
+  --pair=<value>      [default: BTC-PERP] Trading pair
+  --tf=<value>        [default: 1h] Timeframe
+  --wf=<value>        [default: 3m/1m] Walk-forward config: train/test (e.g.
+                      3m/1m)
+
+DESCRIPTION
+  Run walk-forward analysis to test strategy robustness
+
+ALIASES
+  $ rift walk-forward
+
+EXAMPLES
+  $ rift walk-forward trend_follow --pair BTC --tf 1h --wf 3m/1m
+
+  $ rift walk-forward trend_follow --pair BTC --tf 4h --wf 6m/2m
+
+```
+
 ### `rift walkforward`
 
 ```
@@ -1040,10 +1157,13 @@ FLAGS
 DESCRIPTION
   Run walk-forward analysis to test strategy robustness
 
-EXAMPLES
-  $ rift walkforward btc_funding_fade --pair BTC --tf 1h --wf 3m/1m
+ALIASES
+  $ rift walk-forward
 
-  $ rift walkforward btc_funding_fade --pair BTC --tf 1h --wf 6m/2m
+EXAMPLES
+  $ rift walk-forward trend_follow --pair BTC --tf 1h --wf 3m/1m
+
+  $ rift walk-forward trend_follow --pair BTC --tf 4h --wf 6m/2m
 
 ```
 
@@ -1069,6 +1189,34 @@ EXAMPLES
   $ rift withdraw 100
 
   $ rift withdraw 50 --destination 0x1234...
+
+```
+
+### `rift workbench-create`
+
+```
+Create a new custom strategy from a workbench template (config-as-data — no Python required).
+
+USAGE
+  $ rift workbench-create NAME [--template blank|single_signal_example]
+    [--json]
+
+ARGUMENTS
+  NAME  Name for the new strategy (letters, numbers, underscores)
+
+FLAGS
+  --json               Emit raw JSON only
+  --template=<option>  [default: blank] Template to seed from
+                       <options: blank|single_signal_example>
+
+DESCRIPTION
+  Create a new custom strategy from a workbench template (config-as-data — no
+  Python required).
+
+EXAMPLES
+  $ rift workbench-create my_strategy
+
+  $ rift workbench-create rsi_revert --template single_signal_example
 
 ```
 

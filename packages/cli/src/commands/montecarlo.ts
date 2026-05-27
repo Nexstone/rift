@@ -21,8 +21,8 @@ export default class MonteCarlo extends GatedCommand {
   static override description = 'Run Monte Carlo simulation to test how much of your backtest was luck vs edge'
 
   static override examples = [
-    '$ rift montecarlo btc_funding_fade --pair BTC --tf 1h',
-    '$ rift montecarlo btc_funding_fade --pair BTC --runs 50000',
+    '$ rift montecarlo trend_follow --pair BTC --tf 4h',
+    '$ rift montecarlo trend_follow --pair BTC --tf 4h --runs 50000',
   ]
 
   static override args = {
