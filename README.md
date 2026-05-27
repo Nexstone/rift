@@ -32,7 +32,7 @@ The same engine that powers the CLI also powers an MCP server, so Claude / other
 
 ## Architecture
 
-Five layers, each composable on its own:
+Three interfaces over five core engine layers, with auxiliary packages composed on top:
 
 ```
                                 ┌──────────────────────────┐
@@ -61,7 +61,7 @@ Five layers, each composable on its own:
                                 └──────────────────────────────────────┘
 ```
 
-Three interfaces (CLI / Python / MCP), one engine. Whatever the CLI can do, the Python API and the MCP server can also do. Strategies are written once and run from any of the three.
+Three interfaces (CLI / Python / MCP), one engine. The diagram shows the five core engine layers (data → substrate → engine + trade → research); `portfolio`, `strategies-sdk`, `api`, and `core` compose on top. Whatever the CLI can do, the Python API and the MCP server can also do. Strategies are written once and run from any of the three.
 
 ---
 
@@ -99,8 +99,8 @@ mkdir -p ~/.rift && cp .env.example ~/.rift/.env
 You now have:
 - `rift` (CLI) callable via `packages/cli/bin/run.js` — symlink or add to PATH (see above) for the bare `rift` shorthand
 - `rift-engine` Python entry point at `engine/.venv/bin/rift-engine`
-- 11 `rift_*` Python packages available via `import`
-- `rift serve` starts the MCP server
+- 9 `rift_*` Python packages available via `import` (`rift_core`, `rift_data`, `rift_substrate`, `rift_engine`, `rift_trade`, `rift_research`, `rift_portfolio`, `rift_strategies_sdk`, `rift_api`)
+- `rift serve` starts the MCP server (59 tools)
 
 ---
 
@@ -126,15 +126,17 @@ On BTC 4h with default params **against the full 2-year archive** (`rift sync` f
 
 | Layer | Package | What it does |
 |---|---|---|
+| Core | `rift_core` | Shared types, config, schema, key management, NDJSON output protocol — the substrate the other Python packages share |
 | Data | `rift_data` | HL S3 + REST sync, candle / funding / OI / L2-book loaders, local parquet cache |
 | Substrate | `rift_substrate` | Math primitives — frictions, stats, validation (purged CV), regime (HMM), decay, capacity, cross-impact, promotion gates, sealed bundles |
 | Engine | `rift_engine` | Backtest (vectorized + event-driven), walk-forward, Monte Carlo, parameter sweep, Bayesian smart-optimize, signal indicators, strategy base class, TCA, attribution |
 | Trade | `rift_trade` | Capability-tiered auth (T0/T1/T2/T3), order proposal, signed execution, kill switches, position recon, websocket lifecycle |
 | Research | `rift_research` | `run_research_pipeline()` chains data → backtest → WF/MC → advanced validations → sealed bundle |
 | Portfolio | `rift_portfolio` | Multi-strategy supervisor: correlation guard, VaR, pair trades, daemon coordination |
+| API | `rift_api` | HTTP REST API server exposing state files for institutional dashboards and PMS integrations |
+| Strategies SDK | `rift_strategies_sdk` | Scaffold (`rift new <name>`) + the `trend_follow` reference strategy |
 | CLI | `@nexstone/rift-cli` (TS) | 40+ commands, oclif-based, spawns Python engine via subprocess |
 | MCP | (in CLI) | 59 MCP tools wrapping the same engine via `rift serve` — for AI agent integration |
-| Strategies SDK | `rift_strategies_sdk` | Scaffold (`rift new <name>`) + the `trend_follow` reference strategy |
 
 ---
 
