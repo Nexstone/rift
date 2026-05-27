@@ -125,9 +125,27 @@ export async function runEngine(
         resolve()
       } else {
         const lines = stderr.trim().split('\n').filter(l => l.trim())
+
+        // Typer's click-rich style emits errors inside a unicode-box:
+        //   ╭─ Error ──...──╮
+        //   │ <message>     │
+        //   ╰────...──────╯
+        // Pull the message line out so the user sees "No such command X"
+        // instead of the box-drawing close character that happens to be
+        // the last stderr line.
+        const typerBoxMsg = (() => {
+          for (const l of lines) {
+            const m = l.match(/^\s*│\s+(.+?)\s+│?\s*$/)
+            if (m && m[1].trim()) return m[1].trim()
+          }
+          return null
+        })()
+
         const lastLine = lines[lines.length - 1] || ''
-        let errorLine = lines.find(l => /^Error:/.test(l.trim()))
-          || lines.find(l => /^(KeyError|ValueError|TypeError|RuntimeError|FileNotFoundError|ImportError):/.test(l.trim()))
+        let errorLine =
+          typerBoxMsg
+          || lines.find(l => /^Error:/.test(l.trim()))
+          || lines.find(l => /^(KeyError|ValueError|TypeError|RuntimeError|FileNotFoundError|ImportError|AttributeError|NameError):/.test(l.trim()))
           || lastLine
         errorLine = errorLine.trim().replace(/^Error:\s*/, '')
         reject(new Error(errorLine || `Engine exited with code ${code}`))
