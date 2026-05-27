@@ -457,11 +457,7 @@ def scout_cmd(
         from rift_core.config import parse_duration
         interval_seconds = parse_duration(watch)
         if interval_seconds < 5:
-            # Emit as status (so the wrapper actually surfaces it — the
-            # `this.error()` path from a type=error event fires inside an
-            # async readline callback after the oclif lifecycle has
-            # already completed, which swallows the message silently).
-            _emit({"type": "status",
+            _emit({"type": "error",
                    "msg": f"--watch interval too short ({interval_seconds}s). "
                           f"Minimum 5s; recommended 30s+. "
                           f"Pass a duration string like '30s', '5m', '1h'."})

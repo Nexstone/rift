@@ -7,6 +7,7 @@ const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
 const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`
+const red = (s: string) => `\x1b[31m${s}\x1b[0m`
 
 /**
  * Catalog of every engine command, grouped by purpose. Hand-curated so we
@@ -175,26 +176,48 @@ export default class More extends GatedCommand {
 
     const [command, ...passthrough] = rawArgs
 
-    await runEngine(command, passthrough, (msg: EngineMessage) => {
-      // Mirror the engine's NDJSON to the user. For programmatic use,
-      // they can pipe `rift more <cmd> --json …`; here we just surface
-      // what the engine emits in human-readable form.
-      const type = msg.type as string
-      if (type === 'progress' && msg.msg) {
-        this.log(dim(`  ${msg.msg}`))
-      } else if (type === 'status' && msg.msg) {
-        this.log(`  ${msg.msg}`)
-      } else if (type === 'error' && msg.msg) {
-        this.error(msg.msg as string, {exit: 1})
-      } else if (type === 'result') {
-        // The engine emits a structured result — print as pretty JSON
-        // so the user can pipe it or read it.
-        const {type: _t, ...rest} = msg
-        this.log(JSON.stringify(rest, null, 2))
-      } else if (msg.msg) {
-        this.log(`  ${msg.msg}`)
+    // Track whether the engine surfaced its own error message. If it did,
+    // we suppress the generic "Engine exited with code N" footer on
+    // non-zero exit — the user already saw the helpful message.
+    let surfacedError = false
+
+    try {
+      await runEngine(command, passthrough, (msg: EngineMessage) => {
+        // Mirror the engine's NDJSON to the user. For programmatic use,
+        // they can pipe `rift more <cmd> --json …`; here we just surface
+        // what the engine emits in human-readable form.
+        const type = msg.type as string
+        if (type === 'progress' && msg.msg) {
+          this.log(dim(`  ${msg.msg}`))
+        } else if (type === 'status' && msg.msg) {
+          this.log(`  ${msg.msg}`)
+        } else if (type === 'error' && msg.msg) {
+          // Log + flag, but do NOT call this.error() here — it throws
+          // a CLIError synchronously inside an async readline callback,
+          // which oclif's lifecycle does not catch reliably. We let the
+          // engine's non-zero exit propagate via runEngine's rejection
+          // path, and exit(1) silently from the catch below.
+          this.log(`  ${red('Error:')} ${msg.msg}`)
+          surfacedError = true
+        } else if (type === 'result') {
+          // The engine emits a structured result — print as pretty JSON
+          // so the user can pipe it or read it.
+          const {type: _t, ...rest} = msg
+          this.log(JSON.stringify(rest, null, 2))
+        } else if (msg.msg) {
+          this.log(`  ${msg.msg}`)
+        }
+      })
+    } catch (err) {
+      if (surfacedError) {
+        // The engine already printed a human-readable error above.
+        // Exit non-zero silently — no second confusing footer.
+        this.exit(1)
       }
-    })
+      // Genuine engine crash with no structured error — re-raise via
+      // this.error so the user sees the stderr-extracted message.
+      throw err
+    }
   }
 
   private renderCatalog(): void {
