@@ -51,7 +51,7 @@ export default class Init extends GatedCommand {
       this.log(`  trades executed through RIFT on Hyperliquid.`)
       this.log('')
       this.log(`  ${dim('Backtesting, simulation, and analysis are always free.')}`)
-      this.log(`  ${dim('Example: On a $10,000 trade, the fee is $10.')}`)
+      this.log(`  ${dim('Example: on a $10,000 perp trade, the fee is $3.')}`)
       this.log('')
 
       const answer = await ask(`  ${cyan('Do you agree?')} ${dim('(yes/no)')}: `)
