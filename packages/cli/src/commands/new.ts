@@ -13,40 +13,66 @@ const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
 const green = (s: string) => `\x1b[32m${s}\x1b[0m`
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`
 
+/**
+ * Walk up from `start` to find the repo root. We identify the root by the
+ * presence of `pnpm-workspace.yaml` — this file only exists at the top of
+ * the monorepo. Walking up looking for `engine/pyproject.toml` (the prior
+ * heuristic) was buggy because `packages/engine/pyproject.toml` also exists
+ * and would match first, dropping scaffolded files into the wrong dir.
+ */
+function findRepoRoot(start: string): string {
+  let dir = path.resolve(start)
+  for (let i = 0; i < 12; i++) {
+    if (fs.existsSync(path.join(dir, 'pnpm-workspace.yaml'))) return dir
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+  // Fallback: cwd. Better than landing in the wrong subdirectory silently.
+  return path.resolve('.')
+}
+
 export default class New extends GatedCommand {
-  static override description = 'Scaffold a new trading strategy'
+  static override description = 'Scaffold a new trading strategy or scout signal'
 
   static override examples = [
     '$ rift new my-strategy',
     '$ rift new bollinger-breakout',
+    '$ rift new my-momentum-signal --type signal',
   ]
 
   static override args = {
-    name: Args.string({description: 'Strategy name (lowercase, hyphens ok)', required: true}),
+    name: Args.string({description: 'Name (lowercase, hyphens ok)', required: true}),
+  }
+
+  static override flags = {
+    type: Flags.string({
+      description: 'What to scaffold: "strategy" (default) or "signal"',
+      options: ['strategy', 'signal'],
+      default: 'strategy',
+    }),
   }
 
   async run(): Promise<void> {
-    const {args} = await this.parse(New)
+    const {args, flags} = await this.parse(New)
 
-    const name = args.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+    if (flags.type === 'signal') {
+      return this.scaffoldSignal(args.name)
+    }
+    return this.scaffoldStrategy(args.name)
+  }
+
+  // ── Strategy scaffold (existing behavior) ──────────────────────
+  private async scaffoldStrategy(rawName: string): Promise<void> {
+
+    const name = rawName.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
     const className = name.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
     const configName = `${className}Config`
 
-    // Find strategies dir — look for the project root (where package.json + engine/ coexist)
-    let strategiesDir = ''
-    let dir = path.resolve(__dirname)
-    for (let i = 0; i < 10; i++) {
-      const hasEngine = fs.existsSync(path.join(dir, 'engine', 'pyproject.toml'))
-      if (hasEngine) {
-        strategiesDir = path.join(dir, 'strategies')
-        break
-      }
-      dir = path.dirname(dir)
-    }
-
-    if (!strategiesDir) {
-      strategiesDir = path.resolve('strategies')
-    }
+    // Find repo root via `pnpm-workspace.yaml` (only present at the root —
+    // walking up from packages/cli/dist/commands looking for engine/pyproject.toml
+    // would otherwise match packages/engine/pyproject.toml first).
+    const strategiesDir = path.join(findRepoRoot(__dirname), 'strategies')
 
     fs.mkdirSync(strategiesDir, {recursive: true})
 
@@ -198,5 +224,111 @@ rift compare ${name},btc_funding_fade --pair BTC --tf 1h
     function cyan(s: string) { return `\x1b[36m${s}\x1b[0m` }
     function yellow(s: string) { return `\x1b[33m${s}\x1b[0m` }
     function red(s: string) { return `\x1b[31m${s}\x1b[0m` }
+  }
+
+  // ── Signal scaffold (Custom-signal SDK) ───────────────────────
+  private async scaffoldSignal(rawName: string): Promise<void> {
+    const name = rawName.toLowerCase().replace(/[^a-z0-9_]/g, '_')
+
+    const signalsDir = path.join(findRepoRoot(__dirname), 'strategies', 'signals')
+    fs.mkdirSync(signalsDir, {recursive: true})
+
+    const signalFile = path.join(signalsDir, `${name}.py`)
+    if (fs.existsSync(signalFile)) {
+      this.error(`Signal "${name}" already exists at ${signalFile}`)
+    }
+
+    const cyan = (s: string) => `\x1b[36m${s}\x1b[0m`
+
+    // Signal scaffolds are intentionally single-file (no config.yaml, no
+    // sweep.yaml). The signal IS the unit; users register one per file
+    // and the file's @signal(...) decorator is the entire surface.
+    const signalPy = `"""${name} — custom scout signal.
+
+Register with @signal(...). \`rift scout\` discovers this file automatically
+from strategies/signals/ (and ~/.rift/signals/) at scan time.
+
+See docs/signals/AUTHORING.md for the full guide.
+"""
+
+from __future__ import annotations
+
+from rift_strategies_sdk import signal, SignalResult
+
+
+@signal(
+    name="${name}",
+    category="momentum",  # one of: funding, momentum, microstructure,
+                          # volatility, cross_pair, seasonality
+    description="${name} — describe what this signal detects",
+    weight=1.0,           # higher = more influence in aggregation
+)
+def ${name}(coin: str, state: dict) -> SignalResult:
+    """Return a SignalResult with score in [-1, +1].
+
+    Args:
+        coin: ticker symbol, e.g. "BTC"
+        state: dict of available market state. Common keys:
+          - mid_price, funding_rate, predicted_funding, open_interest
+          - oracle_price, premium, atr_pct, day_volume
+          - cvd, volume_delta, relative_volume
+          - candles_1h, candles_5m (lists of {o,h,l,c,v,t})
+          - indicators (dict of pre-computed indicator values)
+
+    Returns:
+        SignalResult with score=+1 (strong long), 0 (no opinion),
+        or -1 (strong short). Score=0 is silently dropped by the
+        aggregator, so always return a meaningful score when fired.
+    """
+    # ──────────────────────────────────────────────────────────────
+    # Replace this with your detection logic.
+    #
+    # Example: extreme funding rate as a contrarian signal.
+    # ──────────────────────────────────────────────────────────────
+    funding = float(state.get("funding_rate") or 0.0)
+
+    # Extreme positive funding → over-leveraged longs → fade
+    if funding > 0.0005:
+        return SignalResult(
+            name="${name}",
+            score=-0.5,
+            reason=f"Extreme positive funding {funding * 100:.3f}% — fade longs",
+            category="momentum",
+            confidence=0.6,
+        )
+
+    # Extreme negative funding → over-leveraged shorts → fade
+    if funding < -0.0005:
+        return SignalResult(
+            name="${name}",
+            score=+0.5,
+            reason=f"Extreme negative funding {funding * 100:.3f}% — fade shorts",
+            category="momentum",
+            confidence=0.6,
+        )
+
+    return SignalResult(
+        name="${name}",
+        score=0.0,
+        reason="Funding within normal range",
+        category="momentum",
+        confidence=0.0,
+    )
+`
+
+    fs.writeFileSync(signalFile, signalPy)
+
+    this.log('')
+    this.log(`  \x1b[32m✔\x1b[0m Signal ${bold(name)} created at:`)
+    this.log('')
+    this.log(`    ${signalFile}`)
+    this.log('')
+    this.log(`  ${dim('Next steps:')}`)
+    this.log(`    1. Edit ${bold(name + '.py')} with your detection logic`)
+    this.log(`    2. Run: ${cyan('rift scout --top 5 --min 1 --no-soak')} (your signal fires alongside the 9 built-ins)`)
+    this.log(`    3. Use ${cyan('rift signal-stats')} to see how often it fires`)
+    this.log('')
+    this.log(`  ${dim('Place user-only signals at ~/.rift/signals/<name>.py (not committed to the repo).')}`)
+    this.log('')
   }
 }

@@ -23,4 +23,33 @@ from rift_strategies_sdk.examples import trend_follow  # noqa: F401
 # Public validator surface — runs preflight checks on a strategy file.
 from rift_strategies_sdk.validator import ValidationReport, validate_strategy
 
-__all__ = ["ValidationReport", "validate_strategy"]
+# ── Custom-signal authoring surface ────────────────────────────────
+# Re-export the signal decorator + result types so users can write
+# their own signals without reaching into engine internals:
+#
+#     from rift_strategies_sdk import signal, SignalResult
+#
+#     @signal(name="my_signal", category="momentum")
+#     def my_signal(coin, state):
+#         return SignalResult(
+#             name="my_signal", score=0.5, reason="…",
+#             category="momentum", confidence=0.6,
+#         )
+#
+# Save the file to <repo>/strategies/signals/ or ~/.rift/signals/.
+# `rift scout` picks up any registered signal at scan time.
+# See docs/signals/AUTHORING.md for the full guide.
+from rift_engine.signals.base import (  # noqa: F401
+    Signal,
+    SignalResult,
+    signal,
+)
+
+__all__ = [
+    "ValidationReport",
+    "validate_strategy",
+    # Signal authoring
+    "Signal",
+    "SignalResult",
+    "signal",
+]

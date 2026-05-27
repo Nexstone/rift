@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import importlib.util
+import re
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 # Global signal registry
@@ -66,3 +70,61 @@ def compute_all_signals(coin: str, state: dict) -> list[SignalResult]:
         except Exception:
             pass  # Signal errors should never crash the system
     return results
+
+
+# ── User-signal discovery ──────────────────────────────────────────
+#
+# Built-in signals self-register when their module is imported (the
+# `signals/__init__.py` triggers this for the 9 bundled categories).
+# User-authored signals live as standalone .py files under
+# `<repo>/strategies/signals/` or `~/.rift/signals/`. They register via
+# the same `@signal(...)` decorator — we just need to import the files
+# so the decorator side-effect fires.
+#
+# Mirrors the `discover_strategies()` pattern in
+# `rift_engine.strategy.discover_strategies` (same path-traversal
+# protection, same underscore-prefix skip, same importlib pattern).
+
+_VALID_SIGNAL_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
+
+
+def load_signal_file(path: Path) -> None:
+    """Import a Python file to trigger its `@signal(...)` decorators.
+
+    Path-traversal protected: only filenames matching `[A-Za-z][\\w]*` load.
+    Skips files starting with `_` (underscore prefix = "don't auto-discover").
+    Failures are swallowed quietly — a broken signal file shouldn't take down
+    every scout command.
+    """
+    if not _VALID_SIGNAL_NAME.match(path.stem):
+        return
+    spec = importlib.util.spec_from_file_location(f"rift.user_signals.{path.stem}", path)
+    if spec is None or spec.loader is None:
+        return
+    try:
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+    except Exception:
+        # Don't crash scout on a broken user signal; just skip it.
+        # (When users want to debug, they can `python -c "import their_signal"`.)
+        pass
+
+
+def discover_user_signals(directories: list[Path]) -> None:
+    """Scan directories for `.py` signal files and load them.
+
+    Call this once at scout invocation time, before `scan_market()`. Built-in
+    signals are already registered via `signals/__init__.py`; this picks up
+    user-authored signals from the configured directories.
+
+    Files starting with `_` are skipped (same convention as the strategies
+    discovery — useful for partial drafts or shared helpers).
+    """
+    for d in directories:
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.py")):
+            if f.name.startswith("_"):
+                continue
+            load_signal_file(f)

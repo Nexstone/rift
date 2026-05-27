@@ -17,7 +17,7 @@ including the ones without a top-level `rift <cmd>` wrapper.
 RIFT — Research / Iteration / Forecast / Trade
 
 VERSION
-  @rift/cli/0.1.0 darwin-arm64 node-v24.14.0
+  @nexstone/rift-cli/0.1.0 darwin-arm64 node-v24.14.0
 
 USAGE
   $ rift [COMMAND]
@@ -37,8 +37,6 @@ COMMANDS
   auth-status         Show RIFT auth state — API wallet + recent authorization
                       tokens.
   backtest            Run a backtest on cached candle data
-  cashcarry           Backtest a cash-and-carry (spot vs perp) delta neutral
-                      strategy
   compare             Compare multiple strategies head-to-head
   config              View and set RIFT configuration
   cost                Estimate pre-trade cost for a hypothetical trade: fees +
@@ -47,8 +45,6 @@ COMMANDS
                       beta-vs-benchmark
   data-inventory      Inventory of locally cached candles, funding, fills —
                       counts + freshness
-  deltaneutral        Same-asset delta neutral backtest (long spot + short perp
-                      on Hyperliquid)
   deposit             Deposit USDC from Arbitrum to Hyperliquid
   doctor              Check system health and diagnose issues
   funding-browser     Browse funding rates across coins — current + window stats
@@ -66,7 +62,7 @@ COMMANDS
                       backtest was luck vs edge
   more                Discover and run every engine command — including those
                       without a top-level `rift <cmd>` wrapper
-  new                 Scaffold a new trading strategy
+  new                 Scaffold a new trading strategy or scout signal
   pairs               Backtest a pairs/spread trade between two assets (e.g.
                       BTC/ETH)
   pairs-backtest      Backtest a pairs/spread trade (e.g. BTC/ETH spread)
@@ -79,8 +75,6 @@ COMMANDS
   scout               Scan the market and find trading opportunities ranked by
                       confluence
   serve               Start RIFT as an MCP server for AI agent integration
-  simulate            Paper trade on real mainnet prices — no real money, real
-                      data
   sweep               Run a parameter sweep to find optimal strategy settings
   test-trade          Place a minimum-size test trade to verify exchange
                       connectivity
@@ -228,32 +222,6 @@ EXAMPLES
 
 ```
 
-### `rift cashcarry`
-
-```
-Backtest a cash-and-carry (spot vs perp) delta neutral strategy
-
-USAGE
-  $ rift cashcarry [--asset <value>] [--tf <value>] [--equity <value>]
-    [--entry-premium <value>] [--exit-premium <value>]
-
-FLAGS
-  --asset=<value>          [default: BTC] Asset
-  --entry-premium=<value>  [default: 0] Enter when premium > this
-  --equity=<value>         [default: 10000] Starting equity
-  --exit-premium=<value>   [default: -0.0005] Exit when premium < this
-  --tf=<value>             [default: 1h] Timeframe
-
-DESCRIPTION
-  Backtest a cash-and-carry (spot vs perp) delta neutral strategy
-
-EXAMPLES
-  $ rift cashcarry --asset BTC --tf 1h
-
-  $ rift cashcarry --asset ETH --tf 1h --equity 50000
-
-```
-
 ### `rift compare`
 
 ```
@@ -394,35 +362,6 @@ EXAMPLES
 
 ```
 
-### `rift deltaneutral`
-
-```
-Same-asset delta neutral backtest (long spot + short perp on Hyperliquid)
-
-USAGE
-  $ rift deltaneutral [--asset <value>] [--tf <value>] [--equity <value>]
-    [--entry-basis <value>] [--exit-basis <value>] [--always-on]
-
-FLAGS
-  --always-on            Always hold the carry position
-  --asset=<value>        [default: HYPE] Asset with spot + perp on Hyperliquid
-  --entry-basis=<value>  [default: 0.001] Enter when basis > this
-  --equity=<value>       [default: 10000] Starting equity
-  --exit-basis=<value>   [default: -0.0005] Exit when basis < this
-  --tf=<value>           [default: 1h] Timeframe
-
-DESCRIPTION
-  Same-asset delta neutral backtest (long spot + short perp on Hyperliquid)
-
-EXAMPLES
-  $ rift deltaneutral --asset HYPE
-
-  $ rift deltaneutral --asset HYPE --always-on
-
-  $ rift deltaneutral --asset HYPE --entry-basis 0.002
-
-```
-
 ### `rift deposit`
 
 ```
@@ -508,7 +447,7 @@ EXAMPLES
 RIFT — Research / Iteration / Forecast / Trade
 
 VERSION
-  @rift/cli/0.1.0 darwin-arm64 node-v24.14.0
+  @nexstone/rift-cli/0.1.0 darwin-arm64 node-v24.14.0
 
 USAGE
   $ rift [COMMAND]
@@ -528,8 +467,6 @@ COMMANDS
   auth-status         Show RIFT auth state — API wallet + recent authorization
                       tokens.
   backtest            Run a backtest on cached candle data
-  cashcarry           Backtest a cash-and-carry (spot vs perp) delta neutral
-                      strategy
   compare             Compare multiple strategies head-to-head
   config              View and set RIFT configuration
   cost                Estimate pre-trade cost for a hypothetical trade: fees +
@@ -538,8 +475,6 @@ COMMANDS
                       beta-vs-benchmark
   data-inventory      Inventory of locally cached candles, funding, fills —
                       counts + freshness
-  deltaneutral        Same-asset delta neutral backtest (long spot + short perp
-                      on Hyperliquid)
   deposit             Deposit USDC from Arbitrum to Hyperliquid
   doctor              Check system health and diagnose issues
   funding-browser     Browse funding rates across coins — current + window stats
@@ -557,7 +492,7 @@ COMMANDS
                       backtest was luck vs edge
   more                Discover and run every engine command — including those
                       without a top-level `rift <cmd>` wrapper
-  new                 Scaffold a new trading strategy
+  new                 Scaffold a new trading strategy or scout signal
   pairs               Backtest a pairs/spread trade between two assets (e.g.
                       BTC/ETH)
   pairs-backtest      Backtest a pairs/spread trade (e.g. BTC/ETH spread)
@@ -570,8 +505,6 @@ COMMANDS
   scout               Scan the market and find trading opportunities ranked by
                       confluence
   serve               Start RIFT as an MCP server for AI agent integration
-  simulate            Paper trade on real mainnet prices — no real money, real
-                      data
   sweep               Run a parameter sweep to find optimal strategy settings
   test-trade          Place a minimum-size test trade to verify exchange
                       connectivity
@@ -731,21 +664,28 @@ EXAMPLES
 ### `rift new`
 
 ```
-Scaffold a new trading strategy
+Scaffold a new trading strategy or scout signal
 
 USAGE
-  $ rift new NAME
+  $ rift new NAME [--type strategy|signal]
 
 ARGUMENTS
-  NAME  Strategy name (lowercase, hyphens ok)
+  NAME  Name (lowercase, hyphens ok)
+
+FLAGS
+  --type=<option>  [default: strategy] What to scaffold: "strategy" (default) or
+                   "signal"
+                   <options: strategy|signal>
 
 DESCRIPTION
-  Scaffold a new trading strategy
+  Scaffold a new trading strategy or scout signal
 
 EXAMPLES
   $ rift new my-strategy
 
   $ rift new bollinger-breakout
+
+  $ rift new my-momentum-signal --type signal
 
 ```
 
@@ -937,33 +877,6 @@ DESCRIPTION
 
 EXAMPLES
   $ rift serve
-
-```
-
-### `rift simulate`
-
-```
-Paper trade on real mainnet prices — no real money, real data
-
-USAGE
-  $ rift simulate [STRATEGY] [--pair <value>] [--tf <value>] [--equity
-    <value>]
-
-ARGUMENTS
-  [STRATEGY]  Strategy name (interactive if omitted)
-
-FLAGS
-  --equity=<value>  [default: 10000] Starting equity in USDC
-  --pair=<value>    [default: BTC] Ticker symbol (e.g. BTC, ETH, SOL)
-  --tf=<value>      Timeframe (auto-detected if omitted)
-
-DESCRIPTION
-  Paper trade on real mainnet prices — no real money, real data
-
-EXAMPLES
-  $ rift simulate
-
-  $ rift simulate btc_funding_fade --pair BTC --duration 4h
 
 ```
 

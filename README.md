@@ -1,5 +1,9 @@
 # RIFT
 
+<p align="center">
+  <img src="docs/assets/rift-home.png" alt="RIFT — Research / Iteration / Forecast / Trade" width="720" />
+</p>
+
 **Quant Trading Infrastructure for Humans and AI.** Research, validate, and deploy systematic trading strategies on Hyperliquid (HL) perps. Published by Nexstone.
 
 > ⚠️ **RIFT is software, not financial advice.** Trading perpetual futures involves substantial risk of loss including the total loss of deposited capital. Past backtest performance does not predict future returns — markets drift, regimes change, models decay. RIFT ships with safety primitives (kill switches, drawdown limits, signed auth tokens, on-chain audit trail) but no software eliminates market risk. Never trade more than you can afford to lose, and never deploy a strategy you don't personally understand. The one strategy that ships (`trend_follow`) is an explicitly demo-only EMA crossover — see its docstring.
@@ -114,7 +118,7 @@ rift research trend_follow --pair BTC --tf 4h
 
 You will see the framework execute: backtest → walk-forward → Monte Carlo → multi-pair → feature importance → volatility forecast → health check → purged CV → alpha decay → capacity → promotion verdict → sealed reproducibility bundle.
 
-On BTC 4h with default params, `trend_follow` returns +25% / Sharpe 0.71 / -6.88% max DD over 2 years, passes 5 of 5 promotion gates. Run it yourself to verify — the framework's verdict is reproducible, not cherry-picked.
+On BTC 4h with default params **against the full 2-year archive** (`rift sync` first), `trend_follow` returns +25.0% / Sharpe 0.71 / -6.88% max DD, passes 5 of 5 promotion gates. Without sync, the auto-fetched ~10-month window will show different numbers — backtest results are window-dependent, and the framework reports honestly on whatever window you give it. The verdict is reproducible; the numbers depend on the data window.
 
 ---
 
@@ -128,8 +132,8 @@ On BTC 4h with default params, `trend_follow` returns +25% / Sharpe 0.71 / -6.88
 | Trade | `rift_trade` | Capability-tiered auth (T0/T1/T2/T3), order proposal, signed execution, kill switches, position recon, websocket lifecycle |
 | Research | `rift_research` | `run_research_pipeline()` chains data → backtest → WF/MC → advanced validations → sealed bundle |
 | Portfolio | `rift_portfolio` | Multi-strategy supervisor: correlation guard, VaR, pair trades, daemon coordination |
-| CLI | `@rift/cli` (TS) | 28 commands, oclif-based, spawns Python engine via subprocess |
-| MCP | (in CLI) | 61 MCP tools wrapping the same engine via `rift serve` — for AI agent integration |
+| CLI | `@nexstone/rift-cli` (TS) | 40+ commands, oclif-based, spawns Python engine via subprocess |
+| MCP | (in CLI) | 59 MCP tools wrapping the same engine via `rift serve` — for AI agent integration |
 | Strategies SDK | `rift_strategies_sdk` | Scaffold (`rift new <name>`) + the `trend_follow` reference strategy |
 
 ---
@@ -165,7 +169,7 @@ Configure your AI client to launch RIFT's MCP server:
 }
 ```
 
-The AI now has access to 60+ tools — backtest, walk-forward, sweep, scout, manual_trade, portfolio_start, audit_export, etc. Everything runs locally on your machine.
+The AI now has access to 59 tools — backtest, walk-forward, sweep, scout, manual_trade, portfolio_start, audit_export, etc. Everything runs locally on your machine.
 
 ---
 
@@ -193,6 +197,7 @@ Start here:
 
 Using RIFT:
 - [`docs/strategies/AUTHORING.md`](docs/strategies/AUTHORING.md) — write a strategy from scratch with the SDK
+- [`docs/signals/AUTHORING.md`](docs/signals/AUTHORING.md) — add your own custom scout signals
 - [`docs/research/METHODOLOGY.md`](docs/research/METHODOLOGY.md) — what walk-forward / Monte Carlo / purged CV / DSR / alpha decay actually do
 - [`docs/mcp/SETUP.md`](docs/mcp/SETUP.md) — wire RIFT into Claude Desktop / Claude Code / Cursor as an MCP server
 - [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) — every command, every flag (auto-generated from `--help`)

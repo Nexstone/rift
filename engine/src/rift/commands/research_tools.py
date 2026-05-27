@@ -190,16 +190,28 @@ def research(
 
 
 def _scout_watch_loop(
-    interval_minutes: int,
+    interval_seconds: int,
     top_n: int, bias_tf: str, entry_tf: str,
     min_confluence: int, soak_seconds: int,
+    *,
+    alert_score: float = 0.4,
+    alert_categories: int = 4,
 ) -> None:
-    """Run Scout on a timer, alert on high-confidence opportunities."""
+    """Run Scout on a timer with continuity tracking + delta output.
 
+    Each iteration:
+      • Rescan via scan_market(...)
+      • Reconcile against the prior batch — emit NEW / DROPPED / UPDATED events
+      • Render a human-readable table via status NDJSON messages (relayed
+        by the TS wrapper to the user's terminal)
+      • Emit `result` NDJSON for pipeable consumers
+      • Fire alerts (NDJSON + optional webhook) when an opp first crosses the
+        score/categories threshold this session
+    """
     import dataclasses
     from rift.scout import scan_market
 
-    # Load webhook config if available
+    # ── Webhook config ───────────────────────────────────────────
     webhook_url = ""
     config_file = Path.home() / ".rift" / "config.json"
     if config_file.exists():
@@ -209,58 +221,192 @@ def _scout_watch_loop(
         except Exception:
             pass
 
-    _emit({"type": "status", "msg": f"Scout watch mode — scanning every {interval_minutes}min"})
+    # ── Lifecycle store (process-local) ──────────────────────────
+    # Tracks each (coin, direction) across scans so the table can show
+    # "live N min", peak score, and ↑/↓ trend arrows. NO learning logic
+    # here — purely UX continuity. (The terminal product owns the
+    # calibration / outcome layer; OSS scout stays observation-only.)
+    tracked: dict[str, dict] = {}  # key=f"{coin}:{direction}"
+
+    def _human_dt(elapsed_s: float) -> str:
+        if elapsed_s < 60:
+            return f"{int(elapsed_s)}s"
+        if elapsed_s < 3600:
+            return f"{int(elapsed_s // 60)}m"
+        return f"{int(elapsed_s // 3600)}h{int((elapsed_s % 3600) // 60)}m"
+
+    def _human_interval(s: int) -> str:
+        if s < 60:
+            return f"{s}s"
+        if s % 60 == 0:
+            return f"{s // 60}m"
+        return f"{s}s"
+
+    interval_human = _human_interval(interval_seconds)
+    started_at = time.time()
+    alerted_keys: set[str] = set()
+    total_unique_opps = 0
+    total_scans = 0
+
+    _emit({"type": "status",
+           "msg": f"● scout watch — every {interval_human}, "
+                  f"alert at score>={alert_score} & cats>={alert_categories}"})
     if webhook_url:
-        _emit({"type": "status", "msg": f"Webhook alerts enabled: {webhook_url[:40]}..."})
+        _emit({"type": "status", "msg": f"● webhook alerts → {webhook_url[:40]}..."})
+    _emit({"type": "status", "msg": "● ctrl+C to stop"})
 
-    seen_keys: set[str] = set()  # prevent duplicate alerts within session
+    try:
+        while True:
+            scan_start = time.time()
+            try:
+                opportunities = scan_market(
+                    top_n=top_n, bias_tf=bias_tf, entry_tf=entry_tf,
+                    min_confluence=min_confluence, soak_seconds=soak_seconds,
+                )
+            except Exception as e:
+                _emit({"type": "error", "msg": f"Scout watch error: {type(e).__name__}: {e}"})
+                time.sleep(interval_seconds)
+                continue
 
-    while True:
-        try:
-            opportunities = scan_market(
-                top_n=top_n, bias_tf=bias_tf, entry_tf=entry_tf,
-                min_confluence=min_confluence, soak_seconds=soak_seconds,
-            )
+            total_scans += 1
+            now = time.time()
+            fresh_keys: set[str] = set()
+            diff_new: list[dict] = []
+            diff_updated: list[dict] = []
 
             for opp in opportunities:
-                if opp.score >= 0.4 and opp.num_categories >= 4:
-                    key = f"{opp.coin}:{opp.direction}:{int(time.time()) // 3600}"
-                    if key not in seen_keys:
-                        seen_keys.add(key)
+                key = f"{opp.coin}:{opp.direction}"
+                fresh_keys.add(key)
+                rec = tracked.get(key)
+                if rec is None:
+                    rec = {
+                        "first_seen": now,
+                        "scans_seen": 1,
+                        "peak_score": opp.score,
+                        "last_score": opp.score,
+                        "score_trend": 0.0,
+                    }
+                    tracked[key] = rec
+                    diff_new.append({
+                        "coin": opp.coin, "direction": opp.direction,
+                        "score": round(opp.score, 3),
+                        "categories": opp.num_categories,
+                    })
+                    total_unique_opps += 1
+                else:
+                    delta = opp.score - rec["last_score"]
+                    rec["scans_seen"] += 1
+                    rec["score_trend"] = delta
+                    rec["last_score"] = opp.score
+                    if opp.score > rec["peak_score"]:
+                        rec["peak_score"] = opp.score
+                    if abs(delta) >= 0.02:
+                        diff_updated.append({
+                            "coin": opp.coin, "direction": opp.direction,
+                            "from": round(opp.score - delta, 3),
+                            "to": round(opp.score, 3),
+                        })
 
-                        alert_data = {
-                            "coin": opp.coin,
-                            "direction": opp.direction,
-                            "score": opp.score,
-                            "confidence": opp.confidence_tier,
-                            "categories": opp.num_categories,
-                            "leverage": opp.leverage,
-                            "entry_price": opp.entry_price,
-                            "target_price": opp.target_price,
-                            "stop_price": opp.stop_price,
-                            "hold_type": opp.hold_type,
-                        }
+                # Alert on first time this opp crosses thresholds this session
+                if (opp.score >= alert_score
+                        and opp.num_categories >= alert_categories
+                        and key not in alerted_keys):
+                    alerted_keys.add(key)
+                    alert_data = {
+                        "coin": opp.coin,
+                        "direction": opp.direction,
+                        "score": opp.score,
+                        "confidence": opp.confidence_tier,
+                        "categories": opp.num_categories,
+                        "leverage": opp.leverage,
+                        "entry_price": opp.entry_price,
+                        "target_price": opp.target_price,
+                        "stop_price": opp.stop_price,
+                        "hold_type": opp.hold_type,
+                    }
+                    _emit({"type": "alert", "event": "scout_opportunity", **alert_data})
+                    if webhook_url:
+                        try:
+                            from rift.alerts import fire_alert
+                            fire_alert("scout_opportunity", alert_data, [{
+                                "type": "webhook",
+                                "url": webhook_url,
+                                "events": ["scout_opportunity"],
+                            }])
+                        except Exception:
+                            pass
 
-                        _emit({"type": "alert", "event": "scout_opportunity", **alert_data})
+            # Detect dropped opps (gone for >1 scan)
+            diff_dropped: list[dict] = []
+            stale_keys = [k for k in tracked if k not in fresh_keys]
+            for k in stale_keys:
+                diff_dropped.append({"key": k})
+                del tracked[k]
 
-                        # Fire webhook if configured
-                        if webhook_url:
-                            try:
-                                from rift.alerts import fire_alert
-                                fire_alert("scout_opportunity", alert_data, [{
-                                    "type": "webhook",
-                                    "url": webhook_url,
-                                    "events": ["scout_opportunity"],
-                                }])
-                            except Exception:
-                                pass
+            # ── Emit NDJSON result for pipeable consumers ──
+            _emit({
+                "type": "result", "command": "scout-watch",
+                "scan_index": total_scans,
+                "scan_duration_s": round(now - scan_start, 2),
+                "opportunities": [dataclasses.asdict(o) for o in opportunities],
+                "new": diff_new,
+                "updated": diff_updated,
+                "dropped": diff_dropped,
+            })
 
-            _emit({"type": "status", "msg": f"Scan done — {len(opportunities)} opportunities. Next in {interval_minutes}min"})
+            # ── Emit human-readable rows as status messages ──
+            _emit({"type": "status",
+                   "msg": f"── scan #{total_scans} — {time.strftime('%H:%M:%S')} "
+                          f"({round(now - scan_start, 1)}s, {len(opportunities)} opps) ──"})
+            if not opportunities:
+                _emit({"type": "status", "msg": "  (no opportunities matched filters)"})
+            else:
+                sorted_opps = sorted(opportunities, key=lambda o: -o.score)
+                for opp in sorted_opps[:10]:
+                    key = f"{opp.coin}:{opp.direction}"
+                    rec = tracked[key]
+                    age = _human_dt(now - rec["first_seen"])
+                    arrow = "↑" if rec["score_trend"] > 0.02 else ("↓" if rec["score_trend"] < -0.02 else "·")
+                    flag = " NEW" if rec["scans_seen"] == 1 else ""
+                    alert_flag = " ★" if opp.score >= alert_score and opp.num_categories >= alert_categories else ""
+                    _emit({"type": "status",
+                           "msg": f"  {opp.direction:5s} {opp.coin:<8s}  "
+                                  f"score={opp.score:.3f}{arrow}  "
+                                  f"cats={opp.num_categories}  "
+                                  f"lev={opp.leverage}x  "
+                                  f"live={age}{flag}{alert_flag}"})
+            if diff_dropped:
+                _emit({"type": "status",
+                       "msg": f"  ↓ dropped: {', '.join(d['key'] for d in diff_dropped[:5])}"})
+            _emit({"type": "status", "msg": f"→ next scan in {interval_human}"})
 
-        except Exception as e:
-            _emit({"type": "error", "msg": f"Scout watch error: {e}"})
+            time.sleep(interval_seconds)
 
-        time.sleep(interval_minutes * 60)
+    except KeyboardInterrupt:
+        elapsed = time.time() - started_at
+        _emit({"type": "status",
+               "msg": f"● watch stopped — {total_scans} scans, "
+                      f"{total_unique_opps} unique opps observed, "
+                      f"{len(alerted_keys)} alerted, "
+                      f"{_human_dt(elapsed)} elapsed"})
+
+
+def _discover_user_signals_for_scout() -> int:
+    """Load any user-authored signals from the conventional directories so
+    `@signal(...)` decorators fire before scan_market reads the registry.
+
+    Looks in `<repo>/strategies/signals/` and `~/.rift/signals/`. Returns
+    the count of newly-registered signals (built-ins are excluded since they
+    were already registered via `rift_engine.signals.__init__`).
+    """
+    from rift_engine.signals.base import discover_user_signals, get_all_signals
+
+    before = set(get_all_signals().keys())
+    repo_signals = Path(__file__).parent.parent.parent.parent.parent / "strategies" / "signals"
+    home_signals = Path.home() / ".rift" / "signals"
+    discover_user_signals([repo_signals, home_signals])
+    after = set(get_all_signals().keys())
+    return len(after - before)
 
 
 @app.command("scout")
@@ -271,11 +417,30 @@ def scout_cmd(
     min_confluence: int = typer.Option(2, "--min", help="Minimum signals on bias timeframe"),
     soak: int = typer.Option(120, "--soak", help="Seconds to collect live websocket data (0 = skip)"),
     no_soak: bool = typer.Option(False, "--no-soak", help="Skip websocket soak (faster, less accurate)"),
-    watch: int = typer.Option(0, "--watch", help="Re-scan every N minutes and alert on high-confidence opportunities"),
+    watch: str = typer.Option(
+        "",
+        "--watch",
+        help="Re-scan continuously. Accepts duration strings like '30s', '5m', '1h'. "
+             "Empty = one-shot scan (default).",
+    ),
+    alert_score: float = typer.Option(
+        0.4,
+        "--alert-score",
+        help="In --watch mode, threshold for webhook alerts (score >= this). Default 0.4.",
+    ),
+    alert_categories: int = typer.Option(
+        4,
+        "--alert-categories",
+        help="In --watch mode, threshold for webhook alerts (num_categories >= this). Default 4.",
+    ),
     # Legacy compat
     tf: str = typer.Option("", "--tf", help="Legacy: sets bias timeframe", hidden=True),
 ) -> None:
-    """Scan the market for opportunities using multi-timeframe bias + entry detection."""
+    """Scan the market for opportunities using multi-timeframe bias + entry detection.
+
+    User-authored signals in `strategies/signals/*.py` and `~/.rift/signals/*.py`
+    are picked up automatically. See docs/signals/AUTHORING.md.
+    """
     from rift.scout import scan_market
     import dataclasses
 
@@ -283,8 +448,28 @@ def scout_cmd(
         bias_tf = tf
     soak_seconds = 0 if no_soak else soak
 
-    if watch > 0:
-        _scout_watch_loop(watch, top, bias_tf, entry_tf, min_confluence, soak_seconds)
+    # Load user-authored signals (built-ins are already registered)
+    user_count = _discover_user_signals_for_scout()
+    if user_count > 0:
+        _emit({"type": "status", "msg": f"Loaded {user_count} user signal(s) from strategies/signals + ~/.rift/signals"})
+
+    if watch:
+        from rift_core.config import parse_duration
+        interval_seconds = parse_duration(watch)
+        if interval_seconds < 5:
+            # Emit as status (so the wrapper actually surfaces it — the
+            # `this.error()` path from a type=error event fires inside an
+            # async readline callback after the oclif lifecycle has
+            # already completed, which swallows the message silently).
+            _emit({"type": "status",
+                   "msg": f"--watch interval too short ({interval_seconds}s). "
+                          f"Minimum 5s; recommended 30s+. "
+                          f"Pass a duration string like '30s', '5m', '1h'."})
+            raise typer.Exit(code=1)
+        _scout_watch_loop(
+            interval_seconds, top, bias_tf, entry_tf, min_confluence, soak_seconds,
+            alert_score=alert_score, alert_categories=alert_categories,
+        )
         return
 
     opportunities = scan_market(
