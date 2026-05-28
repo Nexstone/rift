@@ -18,6 +18,77 @@ from rift.commands._shared import app, _emit, _hint, _sanitize_for_json
 from rift_core.config import parse_duration as _parse_duration
 
 
+def _hl_order_error(resp: dict) -> str | None:
+    """Return the first order-level error message from an HL exchange
+    response, or None if the order was accepted.
+
+    HL's exchange.market_open() returns an outer `{status: "ok"}` even
+    when the inner order is rejected (insufficient margin, below min,
+    invalid size, etc.). The real reject status lives at
+    `resp.response.data.statuses[i].error`. Without unwrapping this,
+    callers display a success result for a rejected order.
+    """
+    try:
+        statuses = resp.get("response", {}).get("data", {}).get("statuses", []) or []
+        for s in statuses:
+            if isinstance(s, dict) and s.get("error"):
+                return s["error"]
+    except (AttributeError, TypeError):
+        pass
+    return None
+
+
+def _resolve_spot_pair(info, user_coin: str) -> tuple[str, str, float, int]:
+    """Resolve a user-facing coin name to HL spot details.
+
+    Returns (pair_id, hl_token_name, price, sz_decimals).
+
+    HL spot uses @N pair identifiers (e.g. @142 for UBTC/USDC) in
+    info.all_mids() and exchange.market_open(), NOT literal pair names
+    like "BTC/USDC". Some tokens use U-prefixed names on spot
+    (BTC → UBTC, ETH → UETH) while others keep their literal name
+    (HYPE, PURR). The spot_user_state holdings dict is keyed by the
+    HL token name (UBTC, not BTC). Each token also has its own
+    szDecimals precision — HL's `float_to_wire` will reject any size
+    with more decimal places than that, so the caller must round.
+
+    Raises ValueError when no pair is found.
+    """
+    name = (
+        user_coin.strip().upper()
+        .replace("/USDC", "")
+        .replace("-PERP", "")
+        .replace("-SPOT", "")
+    )
+    meta = info.spot_meta()
+    tokens_by_name = {t["name"]: t for t in meta["tokens"]}
+    # Try literal name first, then U-prefix variant (BTC → UBTC, ETH → UETH).
+    candidates = [name]
+    if not name.startswith("U"):
+        candidates.append(f"U{name}")
+    for candidate in candidates:
+        if candidate not in tokens_by_name:
+            continue
+        tok = tokens_by_name[candidate]
+        token_idx = tok["index"]
+        sz_decimals = int(tok.get("szDecimals", 4))
+        for p in meta["universe"]:
+            if (
+                len(p["tokens"]) >= 2
+                and p["tokens"][0] == token_idx
+                and p["tokens"][1] == 0  # 0 = USDC
+            ):
+                pair_id = p["name"]
+                mids = info.all_mids()
+                price = float(mids.get(pair_id, 0))
+                return pair_id, candidate, price, sz_decimals
+    raise ValueError(
+        f"No Hyperliquid spot pair found for '{user_coin}'. "
+        f"Try the HL spot token name directly (e.g. UBTC, UETH, HYPE, PURR). "
+        f"List available pairs with `rift more list-pairs`."
+    )
+
+
 @app.command("buy")
 def buy(
     coin: str = typer.Argument(..., help="Token to buy (e.g. HYPE, ETH, BTC)"),
@@ -25,7 +96,6 @@ def buy(
     size: float = typer.Option(0, "--size", help="Token amount to buy"),
 ) -> None:
     """Buy a token on the spot market."""
-    from rift.data import normalize_spot
     from rift.trading_gates import require_trading_ready
     from rift.builder_fee import get_builder_info
 
@@ -33,9 +103,6 @@ def buy(
     if result is None:
         return
     private_key, account_address = result
-
-    pair = normalize_spot(coin)
-    token = pair.split("/")[0]
 
     from hyperliquid.exchange import Exchange
     from hyperliquid.info import Info
@@ -47,14 +114,21 @@ def buy(
     wallet = Account.from_key(private_key)
     exchange = Exchange(wallet, base_url, account_address=account_address)
 
-    # Get current price
-    mids = info.all_mids()
-    price = float(mids.get(pair, 0))
+    # Resolve user-facing name → HL @N pair + token name + current mid +
+    # per-token szDecimals (size precision). HL spot mids and
+    # exchange.market_open() use @N identifiers, not literal "<TOKEN>/USDC"
+    # names. Sizes must be rounded to szDecimals or HL's float_to_wire
+    # rejects the order.
+    try:
+        pair, token, price, sz_decimals = _resolve_spot_pair(info, coin)
+    except ValueError as e:
+        _emit({"type": "error", "msg": str(e)})
+        return
     if price <= 0:
-        _emit({"type": "error", "msg": f"No price found for {pair}. Check if this spot pair exists on Hyperliquid."})
+        _emit({"type": "error", "msg": f"No live price for {token} spot pair {pair}."})
         return
 
-    # Calculate size
+    # Calculate size + round to HL's szDecimals
     if amount > 0:
         buy_size = amount / price
     elif size > 0:
@@ -62,19 +136,33 @@ def buy(
     else:
         _emit({"type": "error", "msg": "Specify --amount (USDC to spend) or --size (tokens to buy)"})
         return
+    buy_size = round(buy_size, sz_decimals)
+    if buy_size <= 0:
+        _emit({"type": "error",
+               "msg": f"Computed size {buy_size} {token} rounds to zero at "
+                      f"szDecimals={sz_decimals}. Increase --amount or use --size with a value above "
+                      f"{10 ** -sz_decimals} {token}."})
+        return
 
     builder_info = get_builder_info("spot")
-    _emit({"type": "progress", "pct": 50, "msg": f"Buying {buy_size:.4f} {token} at ~${price:.4f}..."})
+    _emit({"type": "progress", "pct": 50, "msg": f"Buying {buy_size} {token} at ~${price:.4f}..."})
 
     try:
         resp = exchange.market_open(pair, is_buy=True, sz=buy_size, builder=builder_info)
+        # HL nests order-level errors inside an outer status:'ok' shape. The
+        # outer "ok" only means the request was syntactically valid; the
+        # actual fill/reject is in response.data.statuses[].
+        order_err = _hl_order_error(resp)
+        if order_err:
+            _emit({"type": "error", "msg": f"Buy rejected by Hyperliquid: {order_err}"})
+            return
         _emit({
             "type": "result", "command": "buy", "market": "spot",
-            "token": token, "pair": pair, "size": round(buy_size, 6),
+            "token": token, "pair": pair, "size": round(buy_size, 8),
             "price": price, "total_cost": round(buy_size * price, 2),
             "response": resp,
         })
-        _hint(f"Check holdings with 'rift holdings'")
+        _hint(f"Check holdings with 'rift more holdings'")
     except Exception as e:
         _emit({"type": "error", "msg": f"Buy failed: {e}"})
 
@@ -86,7 +174,6 @@ def sell(
     pct: float = typer.Option(0, "--pct", help="Percentage to sell (e.g. 50 = half)"),
 ) -> None:
     """Sell a token from spot holdings."""
-    from rift.data import normalize_spot
     from rift.trading_gates import require_trading_ready
     from rift.builder_fee import get_builder_info
 
@@ -94,9 +181,6 @@ def sell(
     if result is None:
         return
     private_key, account_address = result
-
-    pair = normalize_spot(coin)
-    token = pair.split("/")[0]
 
     from hyperliquid.exchange import Exchange
     from hyperliquid.info import Info
@@ -107,6 +191,16 @@ def sell(
     info = Info(base_url, skip_ws=True)
     wallet = Account.from_key(private_key)
     exchange = Exchange(wallet, base_url, account_address=account_address)
+
+    # Resolve user-facing name → HL @N pair + token name + price + sz_decimals.
+    # spot_user_state.balances is keyed by HL token name (UBTC, not BTC),
+    # so the resolved `token` name must be used for the holdings lookup
+    # below too — not the raw user input.
+    try:
+        pair, token, price, sz_decimals = _resolve_spot_pair(info, coin)
+    except ValueError as e:
+        _emit({"type": "error", "msg": str(e)})
+        return
 
     # Get current holdings
     spot_state = info.spot_user_state(account_address)
@@ -125,18 +219,30 @@ def sell(
         sell_size = total_held * (pct / 100.0)
     else:
         sell_size = total_held  # sell all
-
-    mids = info.all_mids()
-    price = float(mids.get(pair, 0))
+    # Round DOWN to szDecimals so we never try to sell more than HL allows.
+    # Plain round() would round-half-up which on the "sell all" path could
+    # exceed total_held by an ulp and trigger an "insufficient balance" error.
+    import math
+    factor = 10 ** sz_decimals
+    sell_size = math.floor(sell_size * factor) / factor
+    if sell_size <= 0:
+        _emit({"type": "error",
+               "msg": f"Computed sell size rounds to zero at szDecimals={sz_decimals}. "
+                      f"Holdings too small to sell at HL precision."})
+        return
 
     builder_info = get_builder_info("spot")
-    _emit({"type": "progress", "pct": 50, "msg": f"Selling {sell_size:.4f} {token} at ~${price:.4f}..."})
+    _emit({"type": "progress", "pct": 50, "msg": f"Selling {sell_size} {token} at ~${price:.4f}..."})
 
     try:
         resp = exchange.market_open(pair, is_buy=False, sz=sell_size, builder=builder_info)
+        order_err = _hl_order_error(resp)
+        if order_err:
+            _emit({"type": "error", "msg": f"Sell rejected by Hyperliquid: {order_err}"})
+            return
         _emit({
             "type": "result", "command": "sell", "market": "spot",
-            "token": token, "pair": pair, "size": round(sell_size, 6),
+            "token": token, "pair": pair, "size": round(sell_size, 8),
             "price": price, "total_value": round(sell_size * price, 2),
             "builder_fee": f"{BUILDER_FEE_DISPLAY_SPOT} (sell side)",
             "response": resp,
