@@ -10,12 +10,11 @@
 class Rift < Formula
   desc "Quant trading infrastructure for Hyperliquid (CLI + research + MCP server)"
   homepage "https://nexstone.io"
-  license "Apache-2.0"
-
   # ── Versioned source — bumped automatically by .github/workflows/release.yml
   url "https://github.com/Nexstone/rift/archive/refs/tags/v0.1.0.tar.gz"
   version "0.1.0"
   sha256 "PLACEHOLDER_SHA256_AUTO_FILLED_BY_RELEASE_WORKFLOW"
+  license "Apache-2.0"
 
   # ── Runtime dependencies
   depends_on "node@20"
@@ -25,7 +24,6 @@ class Rift < Formula
     # Pin the Python interpreter so the venv we create points at the same
     # python brew installed (not whatever 3.x happens to be first on PATH).
     python_bin = Formula["python@3.13"].opt_bin/"python3.13"
-    node_bin = Formula["node@20"].opt_bin/"node"
     npm_bin = Formula["node@20"].opt_bin/"npm"
 
     # ── 1. Python engine: create an isolated venv inside libexec and
