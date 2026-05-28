@@ -368,6 +368,21 @@ def run_algo(
         account_value = float(collateral.total)
         if initial_equity <= 0:
             initial_equity = account_value
+        elif initial_equity > account_value:
+            # User declared an `--equity` higher than what's actually on the
+            # account. Without this clamp, the drawdown killswitch (which
+            # compares live equity to initial_equity) fires immediately
+            # because real_equity < declared_equity * (1 - MAX_DRAWDOWN_PCT)
+            # — a false drawdown that's actually just an over-declaration.
+            # Downward overrides (declaring LESS than account holds) remain
+            # legitimate — useful for limiting per-strategy capital exposure
+            # in multi-strategy setups.
+            _emit({
+                "type": "status",
+                "msg": f"Declared --equity ${initial_equity:,.2f} exceeds account value "
+                       f"${account_value:,.2f}; clamping to actual account value.",
+            })
+            initial_equity = account_value
         _emit({"type": "status", "msg": f"Account value: ${account_value:,.2f} ({collateral.mode} mode)"})
     except Exception as e:
         _emit({"type": "error", "msg": f"Cannot query account: {e}"})

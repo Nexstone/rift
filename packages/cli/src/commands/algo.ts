@@ -238,7 +238,15 @@ export default class Algo extends GatedCommand {
       '--equity', String(equity),
       '--account', getAccountAddress(creds),
     ]
-    if (tf) engineArgs.push('--tf', tf)
+    // Note: do NOT forward --tf. The engine `algo` command takes its
+    // interval from the strategy's `default_interval` (e.g. trend_follow
+    // declares "4h"). Passing --tf would crash the daemon at argparse
+    // ("No such option: --tf") and — because spawnDaemon redirects stdio
+    // to /dev/null — the failure would be silent. The viewer would then
+    // render an empty session-complete banner without any actual run.
+    // The `tf` arg from the wrapper is informational only (used by the
+    // viewer for header display).
+    void tf  // intentionally unused at engine call site
 
     // Spawn the engine as a background daemon
     const {pid} = spawnDaemon('algo', engineArgs, {
