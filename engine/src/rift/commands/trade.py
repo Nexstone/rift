@@ -737,6 +737,17 @@ def recon_cmd(
     no_guard: bool = typer.Option(False, "--no-guard", help="Skip correlation guard"),
     history: int = typer.Option(0, "--history", help="Show last N recon trades (default 20)"),
     account_address: str = typer.Option("", "--account", help="Main wallet address"),
+    size_usd_override: float = typer.Option(
+        0.0,
+        "--size-usd",
+        help=(
+            "Override scout's computed position size with a fixed USD value. "
+            "Intended for small-account setup verification (default Kelly sizing "
+            "is typically <1% of equity, below HL's $10 minimum on small balances). "
+            "Volume cap and correlation guard still apply. The override is "
+            "announced loudly in the output. Default 0 = no override."
+        ),
+    ),
 ) -> None:
     """Scout the market, pick a trade, and execute with tape confirmation."""
     # Handle --history early return
@@ -843,6 +854,7 @@ def recon_cmd(
         account_address=account_address,
         confirm_seconds=confirm,
         no_guard=no_guard,
+        size_usd_override=size_usd_override,
     )
 
 

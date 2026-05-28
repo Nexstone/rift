@@ -60,6 +60,7 @@ def run_recon(
     account_address: str = "",
     confirm_seconds: int = 120,
     no_guard: bool = False,
+    size_usd_override: float = 0.0,
 ) -> None:
     """Execute a Scout opportunity with tape confirmation.
 
@@ -68,6 +69,12 @@ def run_recon(
         private_key: Hyperliquid API wallet key
         account_address: Main wallet address
         confirm_seconds: Max seconds to wait for tape confirmation
+        size_usd_override: When > 0, bypass scout's kelly/confluence sizing
+            and use this USD value instead. Volume cap and correlation guard
+            still apply. Intended for small-account testing — every user
+            verifying their setup with a tiny first trade hits the same
+            "size below $10 HL minimum" wall otherwise. The override is
+            announced loudly in the output so it can't be used silently.
     """
     coin = opportunity.coin
     direction = opportunity.direction.lower()
@@ -123,8 +130,19 @@ def run_recon(
                       f"Deposit USDC: `rift deposit` or via app.hyperliquid.xyz."})
         sys.exit(1)
 
-    # Compute position size from mission brief
-    size_usd = equity * opportunity.size_pct * opportunity.leverage
+    # Compute position size — either from scout's mission brief, or from
+    # the explicit override (for small-account testing of the recon path).
+    if size_usd_override > 0:
+        size_usd = size_usd_override
+        _emit({
+            "type": "status",
+            "msg": f"⚠ SIZE OVERRIDE: using ${size_usd_override:.2f} (bypasses scout's "
+                   f"kelly/confluence risk model; volume cap still applies). "
+                   f"Computed model size would have been "
+                   f"${equity * opportunity.size_pct * opportunity.leverage:.2f}.",
+        })
+    else:
+        size_usd = equity * opportunity.size_pct * opportunity.leverage
     price = float(info.all_mids().get(coin, "0"))
     if price <= 0:
         _emit({"type": "error",
