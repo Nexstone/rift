@@ -179,6 +179,17 @@ jobs:
           name: python-wheels
           path: dist-py
 
+      # Install uv (provides uvx) — the publish step shells out to
+      # `uvx --from twine twine upload`, so uv must be on PATH. The
+      # test/build jobs had `astral-sh/setup-uv@v3` already; this job
+      # was missing it and failed v0.1.0 with "uvx: command not found"
+      # on the first wheel upload attempt (no PyPI version-burn because
+      # the error fired before any upload reached PyPI).
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+
       - name: Publish (sub-packages first, then meta)
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
