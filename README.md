@@ -107,10 +107,12 @@ You now have:
 ## Quickstart — 60 seconds
 
 ```bash
-# 1. Sync the last 90 days of BTC data from Hyperliquid S3 archive
-#    (optional — the backtester will auto-fetch from the HL REST API on demand
-#     if you don't sync first; sync gives you faster local backtests)
-rift sync --coins BTC --tf 1h,4h
+# 1. Sync BTC 4h candles + funding from the Hyperliquid S3 archive
+#    (default window: 2023-09-01 → today, ≈2 years). Requires AWS
+#    credentials in ~/.rift/.env. One-time cost: ~$2 in S3 egress.
+#    Skip this and the next step auto-fetches a smaller window (~6-10
+#    months) from the HL REST API — same code runs, smaller sample.
+rift sync --coins BTC --tf 4h
 
 # 2. Run the full research pipeline on the bundled OSS reference strategy
 rift research trend_follow --pair BTC --tf 4h
@@ -118,7 +120,7 @@ rift research trend_follow --pair BTC --tf 4h
 
 You will see the framework execute: backtest → walk-forward → Monte Carlo → multi-pair → feature importance → volatility forecast → health check → purged CV → alpha decay → capacity → promotion verdict → sealed reproducibility bundle.
 
-On BTC 4h with default params **against the full 2-year archive** (`rift sync` first), `trend_follow` returns +25.0% / Sharpe 0.71 / -6.88% max DD, passes 5 of 5 promotion gates. Without sync, the auto-fetched ~10-month window will show different numbers — backtest results are window-dependent, and the framework reports honestly on whatever window you give it. The verdict is reproducible; the numbers depend on the data window.
+With the sync above, `trend_follow` on BTC 4h returns **+25.0% / Sharpe 0.71 / -6.88% max DD over ~2 years, passes 5 of 5 promotion gates** (default config: EMA 50/200, 20% equity per trade). Without the sync, the auto-fetched ~6-10 month window gives smaller numbers — a recent fresh-install run showed roughly **+5.7% / Sharpe 0.32 / fails 3 of 5 gates** on the shorter sample. Same code, same verdict logic; the data window is what changes. The framework reports honestly on whichever you give it.
 
 ---
 
