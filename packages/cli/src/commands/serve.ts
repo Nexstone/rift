@@ -977,6 +977,93 @@ export default class Serve extends GatedCommand {
       },
     )
 
+    // ── Canonical perp-namespace aliases for manual_trade. The
+    // `manual_trade` tool above remains registered for back-compat;
+    // perp_long / perp_short / perp_close make the verb match the
+    // actual action and pair naturally with spot_buy / spot_sell.
+    const perpOpen = async (side: 'long' | 'short', coin: string, size_usd: number, stop_pct: number, leverage: number) => {
+      try {
+        const {loadCredentials, hasFullSetup, getAccountAddress} = await import('../lib/credentials.js')
+        if (!hasFullSetup()) {
+          return {content: [{type: 'text' as const, text: 'Error: Account not set up. Run: rift auth setup'}], isError: true}
+        }
+        const creds = loadCredentials()
+        if (!creds) {
+          return {content: [{type: 'text' as const, text: 'Error: No credentials'}], isError: true}
+        }
+        const {spawnDaemon} = await import('../lib/python-bridge.js')
+        const args = [coin, side, '--size', String(size_usd), '--stop', String(stop_pct / 100), '--leverage', String(leverage), '--account', getAccountAddress(creds)]
+        const {pid} = spawnDaemon('manual-trade', args, {HYPERLIQUID_PRIVATE_KEY: creds.private_key})
+        return {content: [{type: 'text' as const, text: JSON.stringify({
+          status: 'placed',
+          coin, side, size_usd, stop_pct, leverage, pid,
+          msg: `${side.toUpperCase()} ${coin} $${size_usd} placed (stop ${stop_pct}%, ${leverage}x). Daemon monitors until stop hit or SIGTERM.`,
+        }, null, 2)}]}
+      } catch (error: any) {
+        return {content: [{type: 'text' as const, text: `Error: ${error.message}`}], isError: true}
+      }
+    }
+
+    server.tool(
+      'perp_long',
+      'Open a LONG perp position with stop loss on Hyperliquid. The daemon monitors until stop hits or you call perp_close. Pairs naturally with spot_buy / spot_sell — note that "perp_long BTC" and "spot_buy BTC" are TOTALLY DIFFERENT actions even though both buy BTC.',
+      {
+        coin: safeCoin.describe('Coin to long (e.g. BTC, ETH, SOL)'),
+        size_usd: z.number().positive().describe('Position size in USD (required)'),
+        stop_pct: z.number().positive().describe('Stop loss percentage (required — e.g. 2 means 2%)'),
+        leverage: z.number().default(1).describe('Leverage multiplier (default 1 = no leverage)'),
+      },
+      async ({coin, size_usd, stop_pct, leverage}) =>
+        await perpOpen('long', coin, size_usd, stop_pct, leverage),
+    )
+
+    server.tool(
+      'perp_short',
+      'Open a SHORT perp position with stop loss on Hyperliquid. The daemon monitors until stop hits or you call perp_close. CAUTION: "perp_short BTC" OPENS A NEW SHORT — it does NOT close an existing long. To close a long, use perp_close.',
+      {
+        coin: safeCoin.describe('Coin to short (e.g. BTC, ETH, SOL)'),
+        size_usd: z.number().positive().describe('Position size in USD (required)'),
+        stop_pct: z.number().positive().describe('Stop loss percentage (required — e.g. 2 means 2%)'),
+        leverage: z.number().default(1).describe('Leverage multiplier (default 1 = no leverage)'),
+      },
+      async ({coin, size_usd, stop_pct, leverage}) =>
+        await perpOpen('short', coin, size_usd, stop_pct, leverage),
+    )
+
+    server.tool(
+      'perp_close',
+      'Close an open perp position (and cancel any orders for the coin) via reduce-only IOC market order. Pass coin to close a specific position; omit to close ALL perp positions. Use this for manual-trade lifecycle exit or emergency cleanup.',
+      {
+        coin: z.string().default('').describe('Coin to close (e.g. BTC) — omit/empty to close ALL'),
+      },
+      async ({coin}) => {
+        try {
+          const {loadCredentials, hasFullSetup, getAccountAddress} = await import('../lib/credentials.js')
+          if (!hasFullSetup()) {
+            return {content: [{type: 'text' as const, text: 'Error: Account not set up. Run: rift auth setup'}], isError: true}
+          }
+          const creds = loadCredentials()
+          if (!creds) {
+            return {content: [{type: 'text' as const, text: 'Error: No credentials'}], isError: true}
+          }
+          // close-all reads HL_PRIVATE_KEY from env (for security — not from
+          // CLI args). The subprocess inherits process.env so set it here.
+          // Also needs --account for HL queries (agent address ≠ main address).
+          process.env.HYPERLIQUID_PRIVATE_KEY = creds.private_key
+          try {
+            const args: string[] = ['--account', getAccountAddress(creds)]
+            if (coin) args.push('--coin', coin)
+            const result = await collectResult('close-all', args)
+            return {content: [{type: 'text' as const, text: JSON.stringify(cleanResult(result), null, 2)}]}
+          } finally {
+            delete process.env.HYPERLIQUID_PRIVATE_KEY
+          }
+        } catch (error: any) {
+          return {content: [{type: 'text' as const, text: `Error: ${error.message}`}], isError: true}
+        }
+      },
+    )
+
     // ═══════════════════════════════════════════
     //  GROUP 13: Spot Trading
     // ═══════════════════════════════════════════
@@ -1005,6 +1092,53 @@ export default class Serve extends GatedCommand {
     server.tool(
       'sell',
       'Sell a token from spot holdings. 1% builder fee applies on sell side.',
+      {
+        coin: safeCoin.describe('Token to sell (e.g. HYPE, ETH, BTC)'),
+        amount: z.number().default(0).describe('Token amount to sell (0 = all)'),
+        pct: z.number().default(0).describe('Percentage to sell (e.g. 50 = half)'),
+      },
+      async ({coin, amount, pct}) => {
+        try {
+          const args = [coin]
+          if (amount > 0) args.push('--amount', String(amount))
+          if (pct > 0) args.push('--pct', String(pct))
+          const result = await collectResult('sell', args)
+          return {content: [{type: 'text' as const, text: JSON.stringify(cleanResult(result), null, 2)}]}
+        } catch (error: any) {
+          return {content: [{type: 'text' as const, text: `Error: ${error.message}`}], isError: true}
+        }
+      },
+    )
+
+    // ── Canonical spot-namespace aliases. The `buy` / `sell` tools above
+    // remain registered for back-compat with existing AI prompts; the
+    // `spot_buy` / `spot_sell` names disambiguate vs perp trading on the
+    // AI agent surface (`spot_sell BTC` = exit BTC holdings; `perp_short
+    // BTC` = open a short — two very different actions).
+    server.tool(
+      'spot_buy',
+      'Buy a token on the Hyperliquid SPOT market. Same as the legacy `buy` tool — disambiguates vs perp trading. Simple purchase, no leverage. 1% builder fee on sell side only.',
+      {
+        coin: safeCoin.describe('Token to buy (e.g. HYPE, ETH, BTC — auto-resolves to UBTC/UETH on HL spot)'),
+        amount: z.number().default(0).describe('USDC amount to spend'),
+        size: z.number().default(0).describe('Token amount to buy (alternative to amount)'),
+      },
+      async ({coin, amount, size}) => {
+        try {
+          const args = [coin]
+          if (amount > 0) args.push('--amount', String(amount))
+          if (size > 0) args.push('--size', String(size))
+          const result = await collectResult('buy', args)
+          return {content: [{type: 'text' as const, text: JSON.stringify(cleanResult(result), null, 2)}]}
+        } catch (error: any) {
+          return {content: [{type: 'text' as const, text: `Error: ${error.message}`}], isError: true}
+        }
+      },
+    )
+
+    server.tool(
+      'spot_sell',
+      'Sell a token from SPOT holdings back to USDC. Same as the legacy `sell` tool — disambiguates vs perp trading. 1% builder fee applies.',
       {
         coin: safeCoin.describe('Token to sell (e.g. HYPE, ETH, BTC)'),
         amount: z.number().default(0).describe('Token amount to sell (0 = all)'),

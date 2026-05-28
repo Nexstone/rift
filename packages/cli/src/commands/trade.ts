@@ -38,6 +38,13 @@ export default class Trade extends GatedCommand {
     size: Flags.integer({description: 'Position size in USD', default: 0}),
     stop: Flags.string({description: 'Stop loss % (default: 2)', default: '2'}),
     leverage: Flags.integer({description: 'Leverage', default: 1}),
+    // Internal: skip the "Type GO to execute" confirmation prompt. Used
+    // by `rift perp long/short` which already require the user to type
+    // the direction explicitly in the verb (e.g. `rift perp long BTC
+    // --size 10`), so the second confirmation is redundant. The flag is
+    // intentionally undocumented in the user-facing description — it
+    // exists for internal delegation, not for users to type directly.
+    yes: Flags.boolean({description: 'Skip the GO confirmation prompt (for internal delegation)', default: false, hidden: true}),
   }
 
   private dashboardActive = false
@@ -101,10 +108,12 @@ export default class Trade extends GatedCommand {
     this.log(`  ${bold('╚════════════════════════════════════════╝')}`)
     this.log('')
 
-    const confirm = await ask(`  ${cyan('Type "GO" to execute')}: `)
-    if (confirm !== 'GO') {
-      this.log(dim('\n  Cancelled.\n'))
-      return
+    if (!flags.yes) {
+      const confirm = await ask(`  ${cyan('Type "GO" to execute')}: `)
+      if (confirm !== 'GO') {
+        this.log(dim('\n  Cancelled.\n'))
+        return
+      }
     }
 
     this.log('')
