@@ -941,9 +941,13 @@ export default class Serve extends GatedCommand {
       {
         coin: safeCoin.describe('Coin to trade (e.g. BTC, ETH, SOL)'),
         side: z.enum(['long', 'short']).describe('Trade direction'),
-        size_usd: z.number().default(500).describe('Position size in USD'),
-        stop_pct: z.number().default(2).describe('Stop loss percentage (2 = 2%)'),
-        leverage: z.number().default(1).describe('Leverage multiplier'),
+        // size_usd and stop_pct are intentionally REQUIRED — no default.
+        // An invisible default on a real-money trade is a footgun for AI
+        // agents that don't pass every field. Leverage stays defaulted at
+        // 1 because 1x (no leverage) is the conservative no-op.
+        size_usd: z.number().positive().describe('Position size in USD (required — no default; this places a real trade)'),
+        stop_pct: z.number().positive().describe('Stop loss percentage (required — e.g. 2 means 2%)'),
+        leverage: z.number().default(1).describe('Leverage multiplier (default 1 = no leverage)'),
       },
       async ({coin, side, size_usd, stop_pct, leverage}) => {
         try {

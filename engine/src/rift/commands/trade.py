@@ -599,15 +599,40 @@ def algo_stop(
     _emit({"type": "result", "command": "algo-stop", **result})
 
 
+def _require_running_session(strategy: str, pair: str) -> str:
+    """Return the algo session key if a daemon is currently running, else
+    emit an error and exit non-zero.
+
+    Without this check, close-position / tighten-stop / reduce-position
+    would silently write a command file to ~/.rift/algo/commands/<key>.json
+    even when no daemon exists for that key — leaving a stale file that
+    could be picked up later by a daemon spawned with a colliding key. The
+    preflight forces the caller to confirm the session exists before any
+    side effect occurs.
+    """
+    from rift.data import normalize_coin
+    from rift.algo import get_algo_session
+    coin = normalize_coin(pair)
+    key = f"{strategy}_{coin}"
+    session = get_algo_session(strategy, pair)
+    if session is None:
+        _emit({
+            "type": "error",
+            "msg": f"No running algo session for '{key}'. "
+                   f"Start one with `rift algo {strategy} --pair {pair}` first, "
+                   f"or check `rift algo status` to see what's active.",
+        })
+        sys.exit(1)
+    return key
+
+
 @app.command("close-position")
 def close_position(
     strategy: str = typer.Argument(..., help="Strategy name"),
     pair: str = typer.Option("BTC-PERP", "--pair", help="Trading pair"),
 ) -> None:
     """Close position on a running algo session."""
-    from rift.data import normalize_coin
-    coin = normalize_coin(pair)
-    key = f"{strategy}_{coin}"
+    key = _require_running_session(strategy, pair)
     cmd_dir = Path.home() / ".rift" / "algo" / "commands"
     cmd_dir.mkdir(parents=True, exist_ok=True)
     (cmd_dir / f"{key}.json").write_text(json.dumps({"action": "close"}))
@@ -621,9 +646,10 @@ def tighten_stop(
     price: float = typer.Option(..., "--price", help="New stop loss price"),
 ) -> None:
     """Tighten stop loss on a running algo session."""
-    from rift.data import normalize_coin
-    coin = normalize_coin(pair)
-    key = f"{strategy}_{coin}"
+    if price <= 0:
+        _emit({"type": "error", "msg": f"--price must be > 0 (got {price})."})
+        sys.exit(1)
+    key = _require_running_session(strategy, pair)
     cmd_dir = Path.home() / ".rift" / "algo" / "commands"
     cmd_dir.mkdir(parents=True, exist_ok=True)
     (cmd_dir / f"{key}.json").write_text(json.dumps({"action": "tighten_stop", "price": price}))
@@ -637,9 +663,10 @@ def reduce_position(
     pct: float = typer.Option(50.0, "--pct", help="Percentage to close (50 = close half)"),
 ) -> None:
     """Reduce position size on a running algo session."""
-    from rift.data import normalize_coin
-    coin = normalize_coin(pair)
-    key = f"{strategy}_{coin}"
+    if pct <= 0 or pct > 100:
+        _emit({"type": "error", "msg": f"--pct must be in (0, 100] (got {pct})."})
+        sys.exit(1)
+    key = _require_running_session(strategy, pair)
     cmd_dir = Path.home() / ".rift" / "algo" / "commands"
     cmd_dir.mkdir(parents=True, exist_ok=True)
     (cmd_dir / f"{key}.json").write_text(json.dumps({"action": "reduce", "pct": pct / 100.0}))
