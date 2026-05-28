@@ -38,8 +38,8 @@ have seen it referenced thousands of times.
 
 VALIDATED ON BTC 4H (2024-04-15 → 2026-05-20)
 ---------------------------------------------
-Walk-forward + Monte Carlo + Purged CV results on the OSS-bundled BTC
-1132-day dataset (default config: EMA 50/200, 20% equity per trade):
+Walk-forward + Monte Carlo + Purged CV results on the ~2-year BTC 4h
+window above, default config EMA 50/200, 20% equity per trade:
 
   Return:                +25.0% (2-year)
   Sharpe (annualized):   +0.71
@@ -49,8 +49,24 @@ Walk-forward + Monte Carlo + Purged CV results on the OSS-bundled BTC
   Purged CV pass rate:   80%
   Promotion verdict:     PASS (5/5 gates)
 
-These are the actual numbers from the framework — not cherry-picked.
-You can reproduce by running `rift research trend_follow BTC 4h`.
+These are real framework outputs — not cherry-picked. To reproduce
+them:
+
+  rift sync --coins BTC --tf 4h           # one-time, pulls the 2-year
+                                          # window from the HL S3 archive
+                                          # (requires AWS creds, ~$2 cost)
+  rift research trend_follow --pair BTC --tf 4h
+
+Without the sync, `rift research` falls back to whatever recent window
+the HL REST API serves on demand (usually ~6-10 months). The framework
+runs the same code on the smaller window and reports honestly — but the
+shorter sample produces different metrics and won't pass 5/5 gates. The
+verdict logic is reproducible; the data window is what changes.
+
+NOTE: the parquet under `tests/fixtures/data/BTC/4h/` is a 100-day
+*synthetic* dataset used only by CI's integration smoke test (installed
+via conftest.py for the pytest session). It is NOT real HL data and is
+not what produces the metrics above. End users do not see this fixture.
 
 WHY BIDIRECTIONAL
 -----------------
