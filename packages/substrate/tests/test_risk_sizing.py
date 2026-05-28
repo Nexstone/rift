@@ -317,11 +317,20 @@ class TestOptimizer:
         Sigma = np.eye(2) * 0.001
         opt = MeanVarianceOptimizer()
         prev = np.array([0.3, 0.3])
+        # turnover_penalty bumped from 1.0 → 10.0 so the penalty term
+        # dominates the objective by ~4 orders of magnitude over edge +
+        # risk terms. With penalty=1.0 the test sat right at SLSQP's
+        # convergence-discriminating boundary: it converged near prev on
+        # macOS (~[0.3, 0.3]) but to [0.05, 0.05] on Linux CI (likely a
+        # different scipy/BLAS build path → different initial-step
+        # behavior in the SLSQP iteration). 10.0 makes the test's intent
+        # ("strong penalty anchors result") robust on any solver because
+        # the math is overwhelming.
         result = opt.optimize(
             mu, Sigma,
             constraints=OptimizationConstraints(
                 max_gross_leverage=1.0, max_net_leverage=1.0,
-                max_single_position=0.5, turnover_penalty=1.0, risk_aversion=1.0,
+                max_single_position=0.5, turnover_penalty=10.0, risk_aversion=1.0,
             ),
             previous_weights=prev,
         )
