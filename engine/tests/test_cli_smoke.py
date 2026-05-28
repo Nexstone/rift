@@ -15,7 +15,16 @@ from pathlib import Path
 import pytest
 
 
-RIFT = str(Path.home() / "rift" / "engine" / ".venv" / "bin" / "rift-engine")
+# Resolve the venv binaries relative to this test file's location, NOT
+# from Path.home(). The previous Path.home() / "rift" / ... assumption
+# only worked on a dev machine where the repo lives at ~/rift; on CI
+# (workspace at ~/work/rift/rift) and any user who clones elsewhere,
+# the path was wrong and every test in this file failed with
+# FileNotFoundError at the venv lookup.
+_ENGINE_DIR = Path(__file__).resolve().parent.parent  # engine/tests/ -> engine/
+_VENV_BIN = _ENGINE_DIR / ".venv" / "bin"
+RIFT = str(_VENV_BIN / "rift-engine")
+_PYTHON = str(_VENV_BIN / "python")
 
 
 def _run(*args, timeout=15) -> subprocess.CompletedProcess:
@@ -31,7 +40,7 @@ def all_command_names() -> list[str]:
     """
     proc = subprocess.run(
         [
-            str(Path.home() / "rift" / "engine" / ".venv" / "bin" / "python"),
+            _PYTHON,
             "-c",
             "import rift.cli; from rift.commands._shared import app; "
             "[print(c.name) for c in app.registered_commands]",
