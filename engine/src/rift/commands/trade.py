@@ -594,6 +594,17 @@ def algo(
     account_address: str = typer.Option("", "--account", help="Main account address"),
     daemon: bool = typer.Option(False, "--daemon", help="Run as background daemon"),
     strategy_override: str = typer.Option("", "--strategy", help="Force a specific strategy (auto-detect if empty)"),
+    size_usd_override: float = typer.Option(
+        0.0,
+        "--size-usd",
+        help=(
+            "Override the strategy's risk-model-derived position size with a "
+            "fixed USD notional. Intended for small-account setup verification "
+            "(most strategies size 1-20% of equity, below HL's $10 minimum on "
+            "small balances). Volume cap and per-strategy gate still apply. "
+            "Default 0 = no override."
+        ),
+    ),
 ) -> None:
     """Start algo trading — auto-discovers the best strategy for your coin.
 
@@ -669,8 +680,8 @@ def algo(
         initial_equity=equity,
         private_key=private_key,
         account_address=account_address,
-
         daemon=daemon,
+        size_usd_override=size_usd_override,
     )
 
 

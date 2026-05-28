@@ -261,8 +261,18 @@ def run_algo(
     private_key: str = "",
     account_address: str = "",
     daemon: bool = False,
+    size_usd_override: float = 0.0,
 ) -> None:
-    """Run algo trading on Hyperliquid mainnet."""
+    """Run algo trading on Hyperliquid mainnet.
+
+    size_usd_override > 0 replaces the strategy's risk-model-derived
+    position value with a fixed USD notional. Intended for
+    small-account testing — every user with < ~$1000 of collateral
+    will hit "size below $10 HL minimum" otherwise because most
+    strategies size in the 1-20% of equity range. Volume cap and
+    per-strategy gate_max_usd still apply. The override is announced
+    via a `status` NDJSON event so the user sees it on every entry.
+    """
     global _daemon_mode, _daemon_log_file, _daemon_session_key
 
     from hyperliquid.exchange import Exchange
@@ -930,7 +940,19 @@ def run_algo(
                             confluence_ratio = confluence / confluence_checks
                             risk_per_trade *= (0.5 + confluence_ratio)
 
-                        position_value = (equity * risk_per_trade) / sl_pct_trade
+                        if size_usd_override > 0:
+                            # Override the risk-model sizing. Announce on every
+                            # entry so it's never used silently.
+                            computed_value = (equity * risk_per_trade) / sl_pct_trade
+                            position_value = size_usd_override
+                            _emit({
+                                "type": "status",
+                                "msg": f"⚠ SIZE OVERRIDE: using ${size_usd_override:.2f} "
+                                       f"(bypasses risk model; volume cap + gate still apply). "
+                                       f"Model size would have been ${computed_value:.2f}.",
+                            })
+                        else:
+                            position_value = (equity * risk_per_trade) / sl_pct_trade
                         position_value = min(position_value, equity * leverage)
                         # Per-strategy position limit (absolute USD cap)
                         if gate_max_usd and position_value > gate_max_usd:

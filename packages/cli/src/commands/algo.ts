@@ -71,6 +71,14 @@ export default class Algo extends GatedCommand {
     tf: Flags.string({description: 'Timeframe'}),
     equity: Flags.integer({description: 'Starting equity (0 = auto)', default: 0}),
     all: Flags.boolean({description: 'Stop all running sessions', default: false}),
+    'size-usd': Flags.string({
+      description:
+        "Override the strategy's risk-model-derived position size with a fixed USD value " +
+        "(default 0 = no override). Useful for small-account setup verification — default " +
+        "strategy sizing is often below HL's $10 minimum on balances under ~$1000. Volume " +
+        "cap and per-strategy gate still apply.",
+      default: '',
+    }),
   }
 
   private sessionStart = 0
@@ -188,7 +196,7 @@ export default class Algo extends GatedCommand {
     }
 
     this.log('')
-    await this.startAlgo(strategy, flags.pair!, flags.tf, flags.equity!, creds)
+    await this.startAlgo(strategy, flags.pair!, flags.tf, flags.equity!, creds, flags['size-usd'])
   }
 
   private async interactiveStrategyPicker(): Promise<string | undefined> {
@@ -229,6 +237,7 @@ export default class Algo extends GatedCommand {
   private async startAlgo(
     strategy: string, pair: string, tf: string | undefined,
     equity: number, creds: NonNullable<ReturnType<typeof loadCredentials>>,
+    sizeUsdOverride: string = '',
   ): Promise<void> {
     const key = sessionKey(strategy, pair)
 
@@ -247,6 +256,13 @@ export default class Algo extends GatedCommand {
     // The `tf` arg from the wrapper is informational only (used by the
     // viewer for header display).
     void tf  // intentionally unused at engine call site
+
+    // Optional size override (small-account setup verification). Only
+    // forward when the user explicitly passed a value — empty string ==
+    // no override, engine's default of 0.0 means "use risk model".
+    if (sizeUsdOverride && sizeUsdOverride !== '0') {
+      engineArgs.push('--size-usd', sizeUsdOverride)
+    }
 
     // Spawn the engine as a background daemon
     const {pid} = spawnDaemon('algo', engineArgs, {
