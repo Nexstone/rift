@@ -873,11 +873,34 @@ def load_strategy_file(path: Path) -> None:
 
 
 def discover_strategies(directories: list[Path]) -> None:
-    """Scan directories for .py strategy files and load them."""
+    """Scan directories for strategy .py files and load them.
+
+    Two layouts supported:
+      1) Flat: `<dir>/<name>.py` — single-file strategy directly in the dir.
+      2) Scaffold: `<dir>/<name>/strategy.py` — the layout `rift new <name>`
+         produces (with sibling config.yaml, sweep.yaml, README.md).
+
+    Files/dirs starting with `_` (e.g. `__pycache__`, `_helpers.py`) are
+    skipped.
+    """
     for d in directories:
         if not d.is_dir():
             continue
+        # Layout 1: top-level .py files
         for f in sorted(d.glob("*.py")):
             if f.name.startswith("_"):
                 continue
             load_strategy_file(f)
+        # Layout 2: per-strategy subdirs containing strategy.py. This is
+        # what `rift new <name>` scaffolds. Without this loop, scaffolded
+        # strategies are invisible to backtest/algo/research — they never
+        # got loaded because the previous version only globbed *.py at
+        # the top level.
+        for sub in sorted(d.iterdir()):
+            if not sub.is_dir():
+                continue
+            if sub.name.startswith("_") or sub.name.startswith("."):
+                continue
+            strategy_file = sub / "strategy.py"
+            if strategy_file.is_file():
+                load_strategy_file(strategy_file)
