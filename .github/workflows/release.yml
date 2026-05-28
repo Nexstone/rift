@@ -191,8 +191,17 @@ jobs:
           version: "0.4.x"
 
       - name: Publish (sub-packages first, then meta)
+        # Twine on GitHub Actions tries PyPI Trusted Publishing (OIDC) FIRST
+        # before falling back to token auth, and the OIDC attempt errors out
+        # if the workflow doesn't have `id-token: write` permission AND the
+        # PyPI project isn't configured to trust the GitHub Actions
+        # repo/workflow combo (which requires per-project setup on pypi.org).
+        # Setting TWINE_USERNAME=__token__ explicitly signals to twine
+        # "use token auth, skip OIDC" — this matches the docs' recommended
+        # pattern for token-based uploads from CI.
         env:
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
         run: |
           # Sub-packages must publish before rift-engine resolves them as deps.
           # Order: every wheel except the meta first, then the meta.
