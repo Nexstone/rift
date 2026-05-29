@@ -12,7 +12,6 @@ class Rift < Formula
   homepage "https://nexstone.io"
   # ── Versioned source — bumped automatically by .github/workflows/release.yml
   url "https://github.com/Nexstone/rift/archive/refs/tags/v0.1.1.tar.gz"
-  version "0.1.1"
   sha256 "PLACEHOLDER_SHA256_AUTO_FILLED_BY_RELEASE_WORKFLOW"
   license "Apache-2.0"
 
