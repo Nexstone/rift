@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `package.json` and `packages/cli/package.json` license corrected from `MIT` to `Apache-2.0` (the LICENSE file was always Apache-2.0; the package.json fields were incorrect)
-- **Distribution consolidated.** RIFT now ships as a single `rift-engine` wheel that bundles all 10 internal namespace packages (`rift_core`, `rift_data`, `rift_engine`, `rift_trade`, `rift_portfolio`, `rift_research`, `rift_api`, `rift_strategies_sdk`, `rift_substrate`, `rift`). Previously each was a separate PyPI distribution; the multi-package layout hit PyPI's new-project rate limit during the v0.1.0 release and is replaced by this single-wheel design. Internal Python imports and the dev workflow (`uv sync` from `engine/`) are unchanged.
+- **Distribution consolidated.** RIFT now ships as a single `rift-engine-core` wheel that bundles all 10 internal namespace packages (`rift_core`, `rift_data`, `rift_engine`, `rift_trade`, `rift_portfolio`, `rift_research`, `rift_api`, `rift_strategies_sdk`, `rift_substrate`, `rift`). End-user install: `pip install rift-engine-core`. Previously each namespace was a separate PyPI distribution; the multi-package layout hit PyPI's new-project rate limit during the v0.1.0 release and is replaced by this single-wheel design. Internal Python imports and the dev workflow (`uv sync` from `engine/`) are unchanged.
 
 ### Fixed
 - `get_api_key()` now reads from the canonical `~/.rift/credentials` file in addition to the legacy `~/.rift/hl_wallet` path, fixing a regression where users past the initial `rift auth setup` flow could not place trades

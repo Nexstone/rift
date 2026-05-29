@@ -67,15 +67,20 @@ git push origin <branch> --tags
 One consolidated wheel — all 10 internal namespace packages
 (`rift_core`, `rift_data`, `rift_engine`, `rift_trade`, `rift_portfolio`,
 `rift_research`, `rift_api`, `rift_strategies_sdk`, `rift_substrate`, `rift`)
-are bundled into a single `rift-engine` distribution. This avoids PyPI's
-new-project rate limit that blocked the original multi-package design.
+are bundled into a single `rift-engine-core` distribution. The name
+`rift-engine-core` was used (rather than `rift-engine`) because the
+new-project rate limit on the PyPI account was exhausted during the
+original multi-package release attempt; `rift-engine-core` already
+existed on PyPI, so version uploads to it bypass the new-project gate.
+A future minor release may migrate to `rift-engine` once the rate limit
+clears, with `rift-engine-core` kept as an alias.
 
 ```bash
-uv build                          # produces dist/rift_engine-$VERSION-*.whl + .tar.gz
+uv build                          # produces dist/rift_engine_core-$VERSION-*.whl + .tar.gz
 UV_PUBLISH_TOKEN=<token> uv publish dist/*
 ```
 
-Verify at https://pypi.org/project/rift-engine/$VERSION/
+Verify at https://pypi.org/project/rift-engine-core/$VERSION/
 
 The release workflow does this automatically on tag push; manual steps
 above are only for emergency hotfixes outside the workflow.
@@ -113,8 +118,8 @@ For 48 hours after release:
 
 If a critical bug is discovered post-release:
 
-1. Yank `rift-engine` $VERSION via the PyPI web UI:
-   https://pypi.org/manage/project/rift-engine/release/$VERSION/ → "Options" → "Yank"
+1. Yank `rift-engine-core` $VERSION via the PyPI web UI:
+   https://pypi.org/manage/project/rift-engine-core/release/$VERSION/ → "Options" → "Yank"
    (PyPI has no twine/uv yank command — must use the web UI)
 2. Unpublish from npm (within 72h grace period): `npm unpublish @nexstone/rift-cli@$VERSION`
 3. Cut a v0.1.1 hotfix with the fix
@@ -126,21 +131,24 @@ If a critical bug is discovered post-release:
 The original multi-package release attempt published 4 standalone packages
 to PyPI before hitting the new-project rate limit:
 `rift-api`, `rift-core`, `rift-data`, `rift-engine-core` — all at v0.1.0.
-The consolidated v0.1.0 wheel does NOT depend on them; they are orphaned cruft.
+`rift-engine-core` is now reused as the consolidated meta package (v0.1.1+);
+its v0.1.0 release should be yanked. The other three (`rift-api`, `rift-core`,
+`rift-data`) are fully orphaned and should be yanked outright.
 
-Yank them via the PyPI web UI (login required, no CLI equivalent):
-- https://pypi.org/manage/project/rift-api/release/0.1.0/
-- https://pypi.org/manage/project/rift-core/release/0.1.0/
-- https://pypi.org/manage/project/rift-data/release/0.1.0/
-- https://pypi.org/manage/project/rift-engine-core/release/0.1.0/
+Yank via the PyPI web UI (login required, no CLI equivalent):
+- https://pypi.org/manage/project/rift-api/release/0.1.0/  → Yank
+- https://pypi.org/manage/project/rift-core/release/0.1.0/ → Yank
+- https://pypi.org/manage/project/rift-data/release/0.1.0/ → Yank
+- https://pypi.org/manage/project/rift-engine-core/release/0.1.0/ → Yank
+  (the v0.1.0 was the standalone rift_engine namespace; v0.1.1+ supersedes)
 
-For each: "Options" → "Yank" → reason "Superseded by consolidated rift-engine package".
+Reason: "Superseded by consolidated rift-engine-core v0.1.1".
 
 ## What ships in RIFT
 
 For release-notes drafting:
 
-- 1 Python distribution (`rift-engine`) bundling 10 internal namespace packages:
+- 1 Python distribution (`rift-engine-core`) bundling 10 internal namespace packages:
   `rift_core`, `rift_data`, `rift_engine`, `rift_trade`, `rift_portfolio`,
   `rift_research`, `rift_api`, `rift_strategies_sdk`, `rift_substrate`, `rift` (CLI)
 - 1 TypeScript CLI package (`@nexstone/rift-cli`)

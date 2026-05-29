@@ -168,7 +168,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.dry_run == 'false')
     environment:
       name: pypi
-      url: https://pypi.org/project/rift-engine/
+      url: https://pypi.org/project/rift-engine-core/
     steps:
       - name: Download wheels
         uses: actions/download-artifact@v4
@@ -196,10 +196,10 @@ jobs:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          if curl -sf -o /dev/null "https://pypi.org/pypi/rift-engine/${TAG_VERSION}/json"; then
-            echo "Skipping rift-engine ${TAG_VERSION} — already on PyPI"
+          if curl -sf -o /dev/null "https://pypi.org/pypi/rift-engine-core/${TAG_VERSION}/json"; then
+            echo "Skipping rift-engine-core ${TAG_VERSION} — already on PyPI"
           else
-            echo "Publishing rift-engine ${TAG_VERSION}"
+            echo "Publishing rift-engine-core ${TAG_VERSION}"
             uv publish dist-py/*
           fi
 
@@ -208,6 +208,12 @@ jobs:
     name: Publish to npm
     needs: publish-pypi
     runs-on: ubuntu-latest
+    # npm requires 2FA for first publish of @nexstone/rift-cli; the CI
+    # token isn't configured for bypass. Soft-fail so the GitHub Release
+    # still publishes off PyPI. Manual publish from a developer machine
+    # with `--otp=NNNNNN` covers v0.1.x; CI will be re-enabled once a
+    # 2fa-bypass token is added to repo secrets.
+    continue-on-error: true
     if: startsWith(github.ref, 'refs/tags/v') && (github.event_name != 'workflow_dispatch' || inputs.dry_run == 'false')
     environment:
       name: npm
@@ -234,7 +240,10 @@ jobs:
   # ─── Create GitHub Release ────────────────────────────────────────────
   github-release:
     name: GitHub Release
-    needs: [publish-pypi, publish-npm]
+    # PyPI is the load-bearing dep; npm soft-fails until 2fa-bypass token
+    # exists. Release page must publish off PyPI alone so users have a
+    # canonical download even if the npm step is still manual.
+    needs: publish-pypi
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

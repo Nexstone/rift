@@ -11,8 +11,8 @@ class Rift < Formula
   desc "Quant trading infrastructure for Hyperliquid (CLI + research + MCP server)"
   homepage "https://nexstone.io"
   # ── Versioned source — bumped automatically by .github/workflows/release.yml
-  url "https://github.com/Nexstone/rift/archive/refs/tags/v0.1.0.tar.gz"
-  version "0.1.0"
+  url "https://github.com/Nexstone/rift/archive/refs/tags/v0.1.1.tar.gz"
+  version "0.1.1"
   sha256 "PLACEHOLDER_SHA256_AUTO_FILLED_BY_RELEASE_WORKFLOW"
   license "Apache-2.0"
 
@@ -27,11 +27,12 @@ class Rift < Formula
     npm_bin = Formula["node@20"].opt_bin/"npm"
 
     # ── 1. Python engine: create an isolated venv inside libexec and
-    #    install rift-engine (which pulls in all rift-* sub-packages from PyPI).
+    #    install rift-engine-core, the consolidated distribution that
+    #    bundles all 10 internal namespace packages.
     venv = libexec/"python-venv"
     system python_bin, "-m", "venv", venv
     system venv/"bin/python", "-m", "pip", "install", "--upgrade", "pip", "wheel"
-    system venv/"bin/python", "-m", "pip", "install", "rift-engine==#{version}"
+    system venv/"bin/python", "-m", "pip", "install", "rift-engine-core==#{version}"
 
     # ── 2. TS CLI: install globally into libexec so we don't pollute the
     #    user's global npm directory.

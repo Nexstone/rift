@@ -67,13 +67,30 @@ Three interfaces (CLI / Python / MCP), one engine. The diagram shows the five co
 
 ## Install
 
+### End-user install
+
+```bash
+# Python engine (bundles all 10 internal namespace packages)
+pip install rift-engine-core
+
+# TypeScript CLI
+npm install -g @nexstone/rift-cli
+
+# Or both via Homebrew
+brew install Nexstone/tap/rift
+```
+
+After install: `rift --help`.
+
+### Developer install (from source)
+
 Requires:
 - **[`uv`](https://docs.astral.sh/uv/)** for Python (will auto-install Python 3.13 if your system doesn't have it)
 - **Node 20+** and **[`pnpm`](https://pnpm.io/)** for the CLI
 
 ```bash
 # Clone
-git clone <repo-url> rift
+git clone https://github.com/Nexstone/rift
 cd rift
 
 # Python deps via uv (installs Python 3.13 + all workspace packages editable)

@@ -1,6 +1,14 @@
 [project]
-name = "rift-engine"
-version = "0.1.0"
+# Distribution name: `rift-engine-core` rather than `rift-engine` because
+# the new-project rate limit on our PyPI account was exhausted during the
+# original v0.1.0 release attempt. `rift-engine-core` already exists on
+# PyPI from that attempt, so subsequent version uploads to it bypass the
+# new-project gate. The user-facing install command becomes:
+#     pip install rift-engine-core
+# The CLI binary name (rift-engine) and all internal namespace names
+# (rift_core, rift_data, ...) are unaffected.
+name = "rift-engine-core"
+version = "0.1.1"
 description = "RIFT — Research / Iteration / Forecast / Trade. Quant trading infrastructure for Hyperliquid (CLI + research + MCP server)."
 license = "Apache-2.0"
 readme = "README.md"
