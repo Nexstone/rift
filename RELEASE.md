@@ -17,8 +17,10 @@ Work top to bottom; do not skip.
 - [ ] `pytest -k test_integrity_hash_matches_source` — passes (not skipped)
 - [ ] `tsc --noEmit` from `packages/cli/` — 0 errors
 - [ ] `pnpm build` from `packages/cli/` — clean
-- [ ] `cd engine && uv build` — wheel + sdist produced
-- [ ] Each `packages/*` builds — `for d in packages/*; do (cd $d && uv build); done`
+- [ ] `uv build` (at repo root) — single consolidated `rift_engine-*.whl` + sdist produced
+- [ ] `unzip -l dist/rift_engine-*.whl | grep '__init__.py'` lists all 10 namespaces:
+      `rift`, `rift_api`, `rift_core`, `rift_data`, `rift_engine`,
+      `rift_portfolio`, `rift_research`, `rift_strategies_sdk`, `rift_substrate`, `rift_trade`
 
 ### Mainnet sign-off
 
@@ -39,11 +41,14 @@ Work top to bottom; do not skip.
 
 ### Version bumps
 
-- [ ] `engine/pyproject.toml` → `version = "0.1.0"`
+- [ ] `pyproject.toml` (root) → `version = "0.1.0"` — the single source of truth
 - [ ] `packages/cli/package.json` → `"version": "0.1.0"`
-- [ ] Each `packages/*/pyproject.toml` → consistent version
-- [ ] `rift_strategies_sdk/__init__.py` version string (if applicable)
+- [ ] `engine/src/rift/__init__.py` → `__version__ = "0.1.0"`
 - [ ] All version strings agree
+
+Note: the per-package `packages/*/pyproject.toml` files exist for dev-only
+editable installs and are not shipped. Their versions can drift without
+affecting the release wheel.
 
 ## Release: cutting it
 
@@ -57,26 +62,23 @@ git tag -a v$VERSION -m "v$VERSION"
 git push origin <branch> --tags
 ```
 
-### PyPI (Python packages)
+### PyPI (Python package)
 
-In order — packages with deeper dependencies first:
+One consolidated wheel — all 10 internal namespace packages
+(`rift_core`, `rift_data`, `rift_engine`, `rift_trade`, `rift_portfolio`,
+`rift_research`, `rift_api`, `rift_strategies_sdk`, `rift_substrate`, `rift`)
+are bundled into a single `rift-engine` distribution. This avoids PyPI's
+new-project rate limit that blocked the original multi-package design.
 
 ```bash
-for pkg in core data engine trade portfolio research api mcp strategies-sdk; do
-  cd packages/$pkg
-  uv build --no-sources
-  twine upload dist/*
-  cd ../..
-done
-
-# Finally the meta engine
-cd engine
-uv build --no-sources
-twine upload dist/*
-cd ..
+uv build                          # produces dist/rift_engine-$VERSION-*.whl + .tar.gz
+UV_PUBLISH_TOKEN=<token> uv publish dist/*
 ```
 
-Verify each lands at https://pypi.org/project/rift-core/ etc.
+Verify at https://pypi.org/project/rift-engine/$VERSION/
+
+The release workflow does this automatically on tag push; manual steps
+above are only for emergency hotfixes outside the workflow.
 
 ### npm (TypeScript CLI)
 
@@ -111,19 +113,37 @@ For 48 hours after release:
 
 If a critical bug is discovered post-release:
 
-1. Yank the bad version from PyPI: `twine yank rift-core==0.1.0 --reason "<reason>"`
-2. Unpublish from npm (within 72h grace period): `npm unpublish @rift/cli@0.1.0`
+1. Yank `rift-engine` $VERSION via the PyPI web UI:
+   https://pypi.org/manage/project/rift-engine/release/$VERSION/ → "Options" → "Yank"
+   (PyPI has no twine/uv yank command — must use the web UI)
+2. Unpublish from npm (within 72h grace period): `npm unpublish @nexstone/rift-cli@$VERSION`
 3. Cut a v0.1.1 hotfix with the fix
 4. Tell users to upgrade prominently (README banner + GitHub release notes)
 5. If the bug affected mainnet trades, investigate impact + reach out to affected users
+
+## Post-release cleanup (one-time, v0.1.x only)
+
+The original multi-package release attempt published 4 standalone packages
+to PyPI before hitting the new-project rate limit:
+`rift-api`, `rift-core`, `rift-data`, `rift-engine-core` — all at v0.1.0.
+The consolidated v0.1.0 wheel does NOT depend on them; they are orphaned cruft.
+
+Yank them via the PyPI web UI (login required, no CLI equivalent):
+- https://pypi.org/manage/project/rift-api/release/0.1.0/
+- https://pypi.org/manage/project/rift-core/release/0.1.0/
+- https://pypi.org/manage/project/rift-data/release/0.1.0/
+- https://pypi.org/manage/project/rift-engine-core/release/0.1.0/
+
+For each: "Options" → "Yank" → reason "Superseded by consolidated rift-engine package".
 
 ## What ships in RIFT
 
 For release-notes drafting:
 
-- 9 Python packages (rift-core, rift-data, rift-engine-core, rift-trade, rift-portfolio,
-  rift-research, rift-api, rift-strategies-sdk, rift-engine meta)
-- 1 TypeScript CLI package (@rift/cli)
+- 1 Python distribution (`rift-engine`) bundling 10 internal namespace packages:
+  `rift_core`, `rift_data`, `rift_engine`, `rift_trade`, `rift_portfolio`,
+  `rift_research`, `rift_api`, `rift_strategies_sdk`, `rift_substrate`, `rift` (CLI)
+- 1 TypeScript CLI package (`@nexstone/rift-cli`)
 - Trust architecture:
   - Three-layer key model (main wallet via WC + locally-stored API wallet + auth tokens)
   - 4 capability tiers (T0/T1/T2/T3) with T3 gated by signed authorization tokens

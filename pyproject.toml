@@ -1,3 +1,97 @@
+[project]
+name = "rift-engine"
+version = "0.1.0"
+description = "RIFT — Research / Iteration / Forecast / Trade. Quant trading infrastructure for Hyperliquid (CLI + research + MCP server)."
+license = "Apache-2.0"
+readme = "README.md"
+requires-python = ">=3.13"
+authors = [{ name = "Nexstone Capital" }]
+keywords = ["hyperliquid", "trading", "quant", "backtesting", "mcp", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    "polars>=1.0",
+    "pyarrow>=17.0",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "pandas>=2.0",
+    "pydantic>=2.0",
+    "typer>=0.15",
+    "rich>=13.0",
+    "structlog>=24.0",
+    "pyyaml>=6.0",
+    "pysocks>=1.7",
+    "boto3>=1.40",
+    "lz4>=4.4",
+    "hyperliquid-python-sdk>=0.23.0",
+    "scikit-learn>=1.5",
+    "hmmlearn>=0.3",
+    "ruptures>=1.1",
+    "statsmodels>=0.14",
+    "optuna>=4.0",
+    "xgboost>=3.0",
+    "arch>=8.0",
+    # Pinned to 0.6.x: rift_substrate.indicators.core matches column prefixes
+    # specific to this series. A future 0.7 may change shape — evaluate before bumping.
+    "pandas-ta-classic>=0.6.20,<0.7",
+]
+
+[project.scripts]
+rift-engine = "rift.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/Nexstone/rift"
+Documentation = "https://github.com/Nexstone/rift#readme"
+Repository = "https://github.com/Nexstone/rift"
+Issues = "https://github.com/Nexstone/rift/issues"
+Changelog = "https://github.com/Nexstone/rift/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Bundle all 10 namespace packages into a single wheel. Hatchling treats
+# each entry as a top-level importable package — at install time they
+# become siblings, exactly as their cross-imports already assume.
+packages = [
+    "packages/core/src/rift_core",
+    "packages/data/src/rift_data",
+    "packages/engine/src/rift_engine",
+    "packages/trade/src/rift_trade",
+    "packages/portfolio/src/rift_portfolio",
+    "packages/research/src/rift_research",
+    "packages/api/src/rift_api",
+    "packages/strategies-sdk/src/rift_strategies_sdk",
+    "packages/substrate/src/rift_substrate",
+    "engine/src/rift",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "packages/*/src/**",
+    "engine/src/**",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "pyproject.toml",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.0",
+]
+
 [tool.pytest.ini_options]
 # Repo-wide pytest config — makes /Users/milliondollaroffice/rift the rootdir
 # so the top-level conftest.py is discovered by every collected test.
@@ -18,5 +112,6 @@ addopts = "-q --strict-markers"
 markers = [
     "slow: tests that take >1s (real data, network, subprocess)",
     "regression: locks behavior; failure = unexpected change in numeric output",
+    "testnet: requires HL testnet credentials (RIFT_TESTNET_MAIN_KEY) — skipped otherwise",
     "mainnet: would touch real funds — must be opted into explicitly",
 ]

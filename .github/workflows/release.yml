@@ -86,9 +86,9 @@ jobs:
       - name: Run MCP smoke
         run: uv run --project engine pytest engine/tests/test_mcp_smoke.py -m slow
 
-  # ─── Build Python wheels for all 10 packages ──────────────────────────
+  # ─── Build single consolidated Python wheel ───────────────────────────
   build-python:
-    name: Build Python wheels
+    name: Build Python wheel
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -103,19 +103,16 @@ jobs:
       - name: Setup Python 3.13
         run: uv python install 3.13
 
-      # Sub-packages must publish before the meta `rift-engine` declares
-      # them as dependencies. Build them all here; publish step orders.
-      - name: Build all 10 wheels
+      # Single wheel: root pyproject.toml bundles all 10 namespace packages
+      # (rift_core, rift_data, rift_engine, rift_trade, rift_portfolio,
+      # rift_research, rift_api, rift_strategies_sdk, rift_substrate, rift)
+      # into one `rift-engine` distribution. Avoids PyPI's new-project rate
+      # limit and the dependency-ordering juggle the previous multi-package
+      # layout required.
+      - name: Build wheel + sdist
         run: |
           mkdir -p dist-py
-          for d in packages/core packages/data packages/engine \
-                   packages/trade packages/portfolio packages/research \
-                   packages/api packages/strategies-sdk packages/substrate \
-                   engine; do
-            echo "::group::Build $d"
-            (cd "$d" && uv build -o "$GITHUB_WORKSPACE/dist-py")
-            echo "::endgroup::"
-          done
+          uv build -o dist-py
           ls -la dist-py/
 
       - name: Upload wheels artifact
@@ -190,49 +187,20 @@ jobs:
         with:
           version: "0.4.x"
 
-      - name: Publish (sub-packages first, then meta)
-        # Idempotent retry pattern: pre-check each package via PyPI's
-        # JSON API (a separate endpoint from upload, lightly rate-limited),
-        # then `uv publish` for any package version that doesn't exist yet.
-        # Two things this fixes vs the prior attempts:
-        #   1. twine's --skip-existing was implemented by "try-upload,
-        #      accept already-exists as success" — every skip burned a
-        #      hit on PyPI's upload endpoint. With 9 packages and a
-        #      partial-success state, the skip calls alone tripped the
-        #      rate cap on the 4th-5th call.
-        #   2. uv publish --check-url errors with "Package not found in
-        #      registry" when the PROJECT itself doesn't exist yet — fine
-        #      for re-releases but breaks first-time uploads where the
-        #      project gets created.
-        # The JSON API returns 200 if version exists, 404 cleanly otherwise,
-        # so we can branch reliably.
+      - name: Publish single wheel to PyPI
+        # The release ships one consolidated `rift-engine` wheel containing
+        # all 10 internal namespace packages. Pre-check via PyPI's JSON API
+        # so re-runs of the same tag are idempotent and don't error on
+        # "version already exists".
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
-          # Group both wheel + sdist for each package and publish together,
-          # so we hit the upload endpoint once per package not twice.
-          declare -A processed
-          for f in dist-py/*.whl dist-py/*.tar.gz; do
-            fname=$(basename "$f")
-            case "$fname" in rift_engine-*) continue ;; esac
-            pkg_underscore=$(echo "$fname" | sed -E 's/-0\.1\.0.*//')
-            pkg_dash=$(echo "$pkg_underscore" | tr '_' '-')
-            [ -n "${processed[$pkg_dash]+x}" ] && continue
-            processed[$pkg_dash]=1
-            if curl -sf -o /dev/null "https://pypi.org/pypi/${pkg_dash}/0.1.0/json"; then
-              echo "Skipping ${pkg_dash} 0.1.0 — already on PyPI"
-            else
-              echo "Publishing ${pkg_dash} 0.1.0"
-              uv publish dist-py/${pkg_underscore}-0.1.0*
-              sleep 2  # gentle pacing between real uploads
-            fi
-          done
-          # Now the meta (rift-engine), guarded by the same existence check.
-          if curl -sf -o /dev/null "https://pypi.org/pypi/rift-engine/0.1.0/json"; then
-            echo "Skipping rift-engine 0.1.0 — already on PyPI"
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          if curl -sf -o /dev/null "https://pypi.org/pypi/rift-engine/${TAG_VERSION}/json"; then
+            echo "Skipping rift-engine ${TAG_VERSION} — already on PyPI"
           else
-            echo "Publishing rift-engine 0.1.0"
-            uv publish dist-py/rift_engine-0.1.0*
+            echo "Publishing rift-engine ${TAG_VERSION}"
+            uv publish dist-py/*
           fi
 
   # ─── Publish to npm ───────────────────────────────────────────────────
