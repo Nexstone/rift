@@ -1,6 +1,6 @@
 {
   "name": "@nexstone/rift-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "RIFT — Research / Iteration / Forecast / Trade",
   "license": "Apache-2.0",
   "type": "module",

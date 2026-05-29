@@ -8,7 +8,7 @@
 # The CLI binary name (rift-engine) and all internal namespace names
 # (rift_core, rift_data, ...) are unaffected.
 name = "rift-engine-core"
-version = "0.1.1"
+version = "0.1.2"
 description = "RIFT — Research / Iteration / Forecast / Trade. Quant trading infrastructure for Hyperliquid (CLI + research + MCP server)."
 license = "Apache-2.0"
 readme = "README.md"

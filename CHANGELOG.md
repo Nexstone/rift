@@ -5,6 +5,13 @@ All notable changes to RIFT are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-05-29
+
+### Fixed
+- README "59 tools" MCP count corrected to 64 in three places — the count went from 59 to 64 in v0.1.1 with the addition of `spot_buy`, `spot_sell`, `perp_long`, `perp_short`, and `perp_close` namespaced aliases. The Changelog noted the additions but the README references were not updated.
+- `.github/workflows/release.yml` `publish-npm` job: `npm publish dist-npm/*.tgz` was failing with `exit code 128` because npm 9+ interprets a path arg containing `/` as a `<github-org>/<repo>` package spec. Job now runs from `working-directory: dist-npm` with `npm publish *.tgz`, keeping the filename arg slash-free. This was cosmetic for v0.1.1 (the package was published manually from a developer machine) but blocks future CI-driven releases.
+- `engine/src/rift/__init__.py` `__version__` was stuck at `0.1.0` despite the package shipping as v0.1.1. Now correctly tracks the release version.
+
 ## [Unreleased]
 
 ### Added
