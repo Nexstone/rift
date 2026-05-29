@@ -226,10 +226,17 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Publish
+        # `cd` into dist-npm before publish: npm 9+ treats a path arg that
+        # contains a `/` as a `<org>/<repo>` git-spec package reference, not
+        # a local tarball — so `npm publish dist-npm/foo.tgz` triggers a
+        # bogus `git ls-remote ssh://git@github.com/dist-npm/...` clone that
+        # fails with exit 128. Publishing from inside the directory keeps
+        # the arg slash-free.
+        working-directory: dist-npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm publish dist-npm/*.tgz --access public
+          npm publish *.tgz --access public
 
   # ─── Create GitHub Release ────────────────────────────────────────────
   github-release:

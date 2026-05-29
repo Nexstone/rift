@@ -117,7 +117,7 @@ You now have:
 - `rift` (CLI) callable via `packages/cli/bin/run.js` — symlink or add to PATH (see above) for the bare `rift` shorthand
 - `rift-engine` Python entry point at `engine/.venv/bin/rift-engine`
 - 9 `rift_*` Python packages available via `import` (`rift_core`, `rift_data`, `rift_substrate`, `rift_engine`, `rift_trade`, `rift_research`, `rift_portfolio`, `rift_strategies_sdk`, `rift_api`)
-- `rift serve` starts the MCP server (59 tools)
+- `rift serve` starts the MCP server (64 tools)
 
 ---
 
@@ -155,7 +155,7 @@ With the sync above, `trend_follow` on BTC 4h returns **+25.0% / Sharpe 0.71 / -
 | API | `rift_api` | HTTP REST API server exposing state files for institutional dashboards and PMS integrations |
 | Strategies SDK | `rift_strategies_sdk` | Scaffold (`rift new <name>`) + the `trend_follow` reference strategy |
 | CLI | `@nexstone/rift-cli` (TS) | 40+ commands, oclif-based, spawns Python engine via subprocess |
-| MCP | (in CLI) | 59 MCP tools wrapping the same engine via `rift serve` — for AI agent integration |
+| MCP | (in CLI) | 64 MCP tools wrapping the same engine via `rift serve` — for AI agent integration |
 
 ---
 
@@ -190,7 +190,7 @@ Configure your AI client to launch RIFT's MCP server:
 }
 ```
 
-The AI now has access to 59 tools — backtest, walk-forward, sweep, scout, manual_trade, portfolio_start, audit_export, etc. Everything runs locally on your machine.
+The AI now has access to 64 tools — backtest, walk-forward, sweep, scout, manual_trade, portfolio_start, audit_export, etc. Everything runs locally on your machine.
 
 ---
 
