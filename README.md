@@ -70,15 +70,16 @@ Three interfaces (CLI / Python / MCP), one engine. The diagram shows the five co
 ### End-user install
 
 ```bash
-# Python engine (bundles all 10 internal namespace packages)
-pip install rift-engine-core
-
-# TypeScript CLI
-npm install -g @nexstone/rift-cli
-
-# Or both via Homebrew
+# Recommended — installs Python engine + TypeScript CLI together
 brew install Nexstone/tap/rift
+
+# Or install both pieces individually (both are needed)
+pip install rift-engine-core         # Python engine — exposes `rift-engine`
+npm install -g @nexstone/rift-cli    # TypeScript CLI — exposes `rift`
 ```
+
+The TS CLI auto-detects the Python engine via `rift-engine` on PATH.
+Set `RIFT_ENGINE_BINARY=/path/to/rift-engine` to pin a specific install.
 
 After install: `rift --help`.
 

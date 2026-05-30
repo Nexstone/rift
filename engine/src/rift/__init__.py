@@ -1,3 +1,3 @@
 """RIFT — Research / Iteration / Forecast / Trade engine for Hyperliquid."""
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"

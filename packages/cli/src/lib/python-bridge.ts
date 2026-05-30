@@ -1,12 +1,29 @@
 /**
  * Bridge between the TypeScript CLI and the Python engine.
- * Spawns Python processes and reads NDJSON output line by line.
+ *
+ * The CLI ships under three install paths:
+ *
+ *   1. Source clone — `engine/` directory exists above the CLI binary.
+ *      We invoke `python -m rift.cli` with PYTHONPATH set to `engine/src`.
+ *      Used during development.
+ *
+ *   2. Installed wheel — user did `pip install rift-engine-core`. The
+ *      wheel ships a `rift-engine` console script as its entry point.
+ *      We invoke that binary directly. Used for end-user pip/brew installs.
+ *
+ *   3. Env override — `RIFT_ENGINE_BINARY=/path/to/rift-engine` forces us
+ *      to use a specific binary. Used by the Homebrew formula to point at
+ *      the libexec venv's rift-engine even if PATH is weird.
+ *
+ * Detection runs in priority order: env override → source → installed.
+ * Each spawned process inherits the same environment + extraEnv overlay.
  */
 
-import {spawn, execSync} from 'node:child_process'
+import {spawn, execSync, type ChildProcess} from 'node:child_process'
 import {createInterface} from 'node:readline'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
+import * as os from 'node:os'
 import {fileURLToPath} from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -17,59 +34,177 @@ export interface EngineMessage {
   [key: string]: unknown
 }
 
-function getEngineDir(): string {
+type EngineMode =
+  | {kind: 'source'; engineDir: string}
+  | {kind: 'installed'; binary: string}
+
+/** Walk up looking for `engine/pyproject.toml` + `engine/src/rift/cli.py`.
+ *  Only present in a source clone, not in any installed layout. */
+function findSourceEngineDir(): string | null {
   let dir = path.resolve(__dirname)
   for (let i = 0; i < 10; i++) {
     const engineDir = path.join(dir, 'engine')
-    // Require both pyproject.toml AND the rift.cli entry point.
-    // Prevents matching packages/engine (the new rift_engine library)
-    // before reaching the legacy engine/ host that owns -m rift.cli.
+    // Both probes required to avoid matching `packages/engine/` (the
+    // rift_engine library subpackage) before reaching the real `engine/`
+    // host that owns `rift.cli`.
     if (
       fs.existsSync(path.join(engineDir, 'pyproject.toml')) &&
       fs.existsSync(path.join(engineDir, 'src', 'rift', 'cli.py'))
     ) return engineDir
-    dir = path.dirname(dir)
+    const parent = path.dirname(dir)
+    if (parent === dir) break
+    dir = parent
   }
-
-  throw new Error('Cannot find RIFT engine directory')
+  return null
 }
 
-function findPython(): string {
-  // Check engine's uv-managed venv first
-  const engineVenv = path.join(getEngineDir(), '.venv', 'bin', 'python3')
+/** Locate a binary on PATH via `which`. Returns null if not found. */
+function findOnPath(binary: string): string | null {
+  try {
+    const out = execSync(`command -v ${binary}`, {encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore']}).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
+function detectEngine(): EngineMode {
+  // 1. Env override
+  const envBinary = process.env.RIFT_ENGINE_BINARY
+  if (envBinary && fs.existsSync(envBinary)) {
+    return {kind: 'installed', binary: envBinary}
+  }
+
+  // 2. Source clone
+  const sourceDir = findSourceEngineDir()
+  if (sourceDir) {
+    return {kind: 'source', engineDir: sourceDir}
+  }
+
+  // 3. Installed wheel — rift-engine on PATH
+  const binary = findOnPath('rift-engine')
+  if (binary) {
+    return {kind: 'installed', binary}
+  }
+
+  throw new Error(
+    'Cannot find RIFT engine.\n' +
+    '\n' +
+    'Install one of:\n' +
+    '  brew install Nexstone/tap/rift          # all-in-one, recommended\n' +
+    '  pip install rift-engine-core            # Python engine only\n' +
+    '\n' +
+    'Or set RIFT_ENGINE_BINARY=/path/to/rift-engine to use a specific install.'
+  )
+}
+
+/** Find Python for source mode. Prefers the engine's uv-managed venv. */
+function findPythonForSource(engineDir: string): string {
+  const engineVenv = path.join(engineDir, '.venv', 'bin', 'python3')
   if (fs.existsSync(engineVenv)) return engineVenv
 
-  // Check for managed venv in data dir
   const dataVenv = path.join(getDataDir(), 'venv', 'bin', 'python3')
   if (fs.existsSync(dataVenv)) return dataVenv
 
-  // Fall back to system Python
   for (const cmd of ['python3.14', 'python3.13', 'python3']) {
     try {
       execSync(`${cmd} --version`, {stdio: 'ignore'})
       return cmd
     } catch {
-      continue
+      // try next
     }
   }
 
   throw new Error('Python 3.13+ not found. Install Python or run: rift setup')
 }
 
-function getStrategiesDir(): string {
-  let dir = path.resolve(__dirname)
-  for (let i = 0; i < 10; i++) {
-    const strategiesDir = path.join(dir, 'strategies')
-    if (fs.existsSync(strategiesDir)) return strategiesDir
-    dir = path.dirname(dir)
+function getStrategiesDir(engine: EngineMode): string {
+  if (engine.kind === 'source') {
+    // Walk up from the CLI's location looking for a `strategies/` sibling
+    // to engine/. Falls back to <repo-root>/strategies.
+    let dir = path.resolve(__dirname)
+    for (let i = 0; i < 10; i++) {
+      const stratDir = path.join(dir, 'strategies')
+      if (fs.existsSync(stratDir)) return stratDir
+      const parent = path.dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+    return path.join(engine.engineDir, '..', 'strategies')
   }
 
-  const projectRoot = path.resolve(__dirname, '..', '..', '..', '..')
-  return path.join(projectRoot, 'strategies')
+  // Installed mode: strategies live under the user's data dir. We create
+  // it on demand so `rift new` and `rift algo` see the same path even
+  // if the user never explicitly initialized it.
+  const stratDir = path.join(getDataDir(), 'strategies')
+  if (!fs.existsSync(stratDir)) {
+    fs.mkdirSync(stratDir, {recursive: true})
+  }
+  return stratDir
 }
 
 export function getDataDir(): string {
-  return path.join(process.env.HOME || '~', '.rift')
+  return path.join(process.env.HOME || os.homedir(), '.rift')
+}
+
+/** Public helper — install-mode-aware strategies dir, for commands that
+ *  scaffold or list strategies. */
+export function resolveStrategiesDir(): string {
+  return getStrategiesDir(detectEngine())
+}
+
+const COMMANDS_WITH_STRATEGIES_DIR = new Set([
+  'backtest', 'strategies', 'compare', 'walk-forward',
+  'sweep', 'montecarlo', 'portfolio-backtest', 'research',
+  'quick-test', 'algo',
+])
+
+interface SpawnPlan {
+  cmd: string
+  args: string[]
+  env: NodeJS.ProcessEnv
+  cwd?: string
+}
+
+function buildSpawnPlan(
+  command: string,
+  args: string[],
+  extraEnv: Record<string, string> | undefined,
+  engine: EngineMode,
+): SpawnPlan {
+  const finalArgs: string[] = []
+  let cmd: string
+  let cwd: string | undefined
+  let env: NodeJS.ProcessEnv
+
+  if (engine.kind === 'source') {
+    const python = findPythonForSource(engine.engineDir)
+    cmd = python
+    finalArgs.push('-m', 'rift.cli')
+    cwd = engine.engineDir
+    env = {
+      ...process.env,
+      ...extraEnv,
+      PYTHONPATH: path.join(engine.engineDir, 'src'),
+      PYTHONUNBUFFERED: '1',
+    }
+  } else {
+    cmd = engine.binary
+    cwd = undefined // inherit caller's cwd
+    env = {
+      ...process.env,
+      ...extraEnv,
+      PYTHONUNBUFFERED: '1',
+    }
+  }
+
+  finalArgs.push(command, ...args)
+
+  if (COMMANDS_WITH_STRATEGIES_DIR.has(command)) {
+    finalArgs.push('--strategies-dir', getStrategiesDir(engine))
+  }
+
+  return {cmd, args: finalArgs, env, cwd}
 }
 
 export async function runEngine(
@@ -78,29 +213,12 @@ export async function runEngine(
   onMessage: (msg: EngineMessage) => void,
   extraEnv?: Record<string, string>,
 ): Promise<void> {
-  const python = findPython()
-  const engineDir = getEngineDir()
-  const strategiesDir = getStrategiesDir()
+  const engine = detectEngine()
+  const plan = buildSpawnPlan(command, args, extraEnv, engine)
 
-  const fullArgs = [
-    '-m', 'rift.cli',
-    command,
-    ...args,
-  ]
-
-  // Only add --strategies-dir for commands that accept it
-  if (['backtest', 'strategies', 'compare', 'walk-forward', 'sweep', 'montecarlo', 'portfolio-backtest', 'research', 'quick-test', 'algo'].includes(command)) {
-    fullArgs.push('--strategies-dir', strategiesDir)
-  }
-
-  const proc = spawn(python, fullArgs, {
-    cwd: engineDir,
-    env: {
-      ...process.env,
-      ...extraEnv,
-      PYTHONPATH: path.join(engineDir, 'src'),
-      PYTHONUNBUFFERED: '1',
-    },
+  const proc = spawn(plan.cmd, plan.args, {
+    cwd: plan.cwd,
+    env: plan.env,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
@@ -158,14 +276,14 @@ export async function runEngine(
   })
 
   // Expose the child process for signal control (used by raw mode ESC handler)
-  ;(promise as any)._proc = proc
+  ;(promise as unknown as {_proc: ChildProcess})._proc = proc
 
   return promise
 }
 
 /** Get the child process from a runEngine promise (for sending signals) */
-export function getEngineProcess(promise: Promise<void>): import('node:child_process').ChildProcess | null {
-  return (promise as any)?._proc ?? null
+export function getEngineProcess(promise: Promise<void>): ChildProcess | null {
+  return (promise as unknown as {_proc?: ChildProcess})._proc ?? null
 }
 
 /**
@@ -178,27 +296,15 @@ export function spawnDaemon(
   args: string[],
   extraEnv?: Record<string, string>,
 ): {pid: number} {
-  const python = findPython()
-  const engineDir = getEngineDir()
-
-  const fullArgs = [
-    '-m', 'rift.cli',
-    command,
-    ...args,
-    '--daemon',
-  ]
+  const engine = detectEngine()
+  const plan = buildSpawnPlan(command, [...args, '--daemon'], extraEnv, engine)
 
   // Open /dev/null for stdio — daemon writes to its own log file
   const devNull = fs.openSync('/dev/null', 'r+')
 
-  const proc = spawn(python, fullArgs, {
-    cwd: engineDir,
-    env: {
-      ...process.env,
-      ...extraEnv,
-      PYTHONPATH: path.join(engineDir, 'src'),
-      PYTHONUNBUFFERED: '1',
-    },
+  const proc = spawn(plan.cmd, plan.args, {
+    cwd: plan.cwd,
+    env: plan.env,
     stdio: [devNull, devNull, devNull],
     detached: true,
   })

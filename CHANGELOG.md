@@ -5,6 +5,13 @@ All notable changes to RIFT are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-05-29
+
+### Fixed
+- **`rift` CLI now works for end-user installs.** Previously the TS CLI walked the filesystem looking for `engine/pyproject.toml` + `engine/src/rift/cli.py` — a layout that only exists in a source clone. Users who installed via `pip install rift-engine-core` + `npm install -g @nexstone/rift-cli` (or `brew install Nexstone/tap/rift`) got a `rift` binary that threw "Cannot find RIFT engine directory" on every command. `packages/cli/src/lib/python-bridge.ts` now detects three modes in priority order: (1) `RIFT_ENGINE_BINARY` env var → use that binary, (2) source clone → use `python -m rift.cli` with PYTHONPATH set, (3) `rift-engine` on PATH → use that binary. The Homebrew formula now also sets `RIFT_ENGINE_BINARY` explicitly to pin the libexec venv's binary even if the user has another `rift-engine` installed elsewhere.
+- `getStrategiesDir()` now returns `~/.rift/strategies` for installed users (created on demand) instead of a nonexistent path under a non-source layout.
+- README "End-user install" now correctly says both `pip install rift-engine-core` AND `npm install -g @nexstone/rift-cli` are needed for the `rift` command — previously implied any one alone would work.
+
 ## [0.1.2] - 2026-05-29
 
 ### Fixed
