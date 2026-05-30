@@ -11,7 +11,7 @@ class Rift < Formula
   desc "Quant trading infrastructure for Hyperliquid (CLI + research + MCP server)"
   homepage "https://nexstone.io"
   # ── Versioned source — bumped automatically by .github/workflows/release.yml
-  url "https://github.com/Nexstone/rift/archive/refs/tags/v0.1.1.tar.gz"
+  url "https://github.com/Nexstone/rift/archive/refs/tags/v0.1.2.tar.gz"
   sha256 "PLACEHOLDER_SHA256_AUTO_FILLED_BY_RELEASE_WORKFLOW"
   license "Apache-2.0"
 
